@@ -1,0 +1,104 @@
+%% FedNPG-ADMM reproduction report
+%%
+%% SINGLE COLUMN, deliberately. Three reasons, all reversible:
+%%   1. The paper we reproduce (NeurIPS 2023) is itself single-column, so a
+%%      side-by-side reading of our tables against theirs stays honest.
+%%   2. Our comparison tables are wide -- four agent counts x (ours, paper)
+%%      -- and would need \resizebox or landscape in a two-column layout.
+%%   3. Algorithm blocks and aligned equations survive line breaks better.
+%% To try two columns: add [twocolumn] to \documentclass and expect to wrap
+%% Tables 1-2 in table* and shrink the algorithm float.
+\documentclass[11pt,a4paper]{article}
+
+\usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
+\usepackage{lmodern}
+\usepackage[margin=2.6cm]{geometry}
+
+\usepackage{amsmath,amssymb,amsthm}
+\usepackage{booktabs}
+\usepackage{graphicx}
+\usepackage{subcaption}
+\usepackage[font=small,labelfont=bf]{caption}
+\usepackage{algorithm}
+\usepackage{algpseudocode}
+\usepackage{siunitx}
+\sisetup{detect-weight=true,detect-family=true}
+% siunitx v2 (TeX Live <=2020) hides \byte behind binary-units; v3 provides
+% it natively and removed the option. Apply it only on the old version.
+\makeatletter
+\@ifpackagelater{siunitx}{2021/01/01}{}{\sisetup{binary-units=true}}
+\makeatother
+\usepackage[dvipsnames]{xcolor}
+\usepackage{pgfplots}
+% TeX Live 2020 ships pgfplots with a 1.17 ceiling; 1.17 is also accepted
+% by current pgfplots, so this compiles both here and on Overleaf.
+\pgfplotsset{compat=1.17}
+\usepgfplotslibrary{fillbetween}
+% Figure palette. Colour-blind safe (Okabe-Ito), and distinguishable in
+% greyscale by the line ordering rather than by hue alone.
+\definecolor{colorA}{HTML}{0072B2}
+\definecolor{colorB}{HTML}{D55E00}
+\definecolor{colorC}{HTML}{009E73}
+\definecolor{colorD}{HTML}{CC79A7}
+\usepackage[numbers,sort&compress]{natbib}
+\usepackage[hidelinks,breaklinks]{hyperref}
+% The title contains \\ for visual line breaks, which hyperref cannot put into
+% the PDF metadata string. Give it a flat version instead of letting it warn
+% and guess.
+\hypersetup{pdftitle={Communication-Efficient Federated Natural Policy
+  Gradient: A Reproduction and Extension of FedNPG-ADMM},
+  pdfauthor={Edoardo Scarpel, Daniele Zebele}}
+\usepackage{microtype}
+\usepackage{multirow}
+
+% Notation shortcuts -- keep these consistent with Section 2.
+\newcommand{\Rb}{\mathbb{R}}
+\newcommand{\Exp}{\mathbb{E}}
+\newcommand{\bg}{\mathbf{g}}
+\newcommand{\by}{\mathbf{y}}
+\newcommand{\bH}{\mathbf{H}}
+\newcommand{\bF}{\mathbf{F}}
+\newcommand{\bthe}{\boldsymbol{\theta}}
+\newcommand{\blam}{\boldsymbol{\lambda}}
+\newcommand{\Oh}{\mathcal{O}}
+% Flag for anything not yet measured; delete the definition to find leftovers.
+\newcommand{\TODO}[1]{\textcolor{BrickRed}{\textbf{[TODO: #1]}}}
+
+\title{\textbf{Communication-Efficient Federated Natural \\
+Policy Gradient: A Reproduction \\
+and Extension of FedNPG-ADMM}}
+
+\author{
+  Edoardo Scarpel \\
+  \texttt{edoardo.scarpel@phd.unipd.it}
+  \and
+  Daniele Zebele \\
+  \texttt{daniele.zebele@phd.unipd.it}
+}
+\date{Department of Information Engineering, University of Padua \\[2pt] \today}
+
+\begin{document}
+\maketitle
+
+\begin{abstract}
+\input{sections/00_abstract}
+\end{abstract}
+
+\input{sections/01_introduction}
+\input{sections/02_background}
+\input{sections/03_method}
+\input{sections/04_implementation}
+\input{sections/05_reproduction}
+\input{sections/06_baselines}
+\input{sections/07_quantization}
+\input{sections/08_discussion}
+\input{sections/09_conclusion}
+
+\bibliographystyle{plainnat}
+\bibliography{refs}
+
+\appendix
+\input{sections/A_hyperparameters}
+
+\end{document}

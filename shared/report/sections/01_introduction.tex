@@ -1,0 +1,54 @@
+% !TEX root = ../main.tex
+\section{Introduction}
+\label{sec:introduction}
+
+Federated Reinforcement Learning (FedRL) lets several agents improve a shared
+policy without pooling their raw trajectories. In the \emph{horizontal}
+setting studied here, every agent faces the same environment, collects its own
+experience, and periodically exchanges model information with a central server
+\citep{qi2021fedrlsurvey}. This differs from Multi-Agent Reinforcement Learning (MARL), where agents
+inhabit a single shared environment and interact with one another. No agent
+here observes another's actions.
+
+First-order federated policy gradient methods communicate a $d$-dimensional
+gradient per round, which is cheap but inherits the slow convergence of plain
+policy gradient. Natural Policy Gradient (NPG) converges considerably faster
+by preconditioning the gradient with the inverse Fisher information matrix,
+but a naive federation of NPG requires each agent to transmit its full local
+Fisher $\bH_i \in \Rb^{d \times d}$. For the policies used in continuous
+control this is fatal. Our Humanoid policy has $d = \num{727074}$ parameters,
+so a single $\bH_i$ occupies \SI{2.1}{\peta\byte} at double precision, four
+orders of magnitude beyond any machine we could deploy.
+
+\citet{lan2023fednpgadmm} resolve this by observing that the global NPG direction
+$\left(\sum_i \bH_i\right)^{-1}\sum_i \bg_i$ is the solution of a distributed
+quadratic program, which consensus ADMM solves while exchanging only
+$d$-dimensional vectors. The communication cost drops from $\Oh(d^2)$ to
+$\Oh(d)$ at the same convergence rate and with no additional sample
+complexity.
+
+\paragraph{Contributions.} This report makes four contributions.
+\begin{enumerate}
+  \item An exposition of the theory: policy and natural gradients, the
+        consensus reformulation and ADMM updates behind FedNPG-ADMM, and its
+        convergence and communication guarantees
+        (Sections~\ref{sec:background}--\ref{sec:method}).
+  \item A from-scratch PyTorch implementation of Algorithm~\ref{alg:fednpgadmm}
+        and a reproduction study across three MuJoCo environments, four agent
+        counts and five seeds (Sections~\ref{sec:implementation}--%
+        \ref{sec:reproduction}). The code is publicly available at
+        \url{https://github.com/edos08/FedNPG-ADMM-FedRL}.
+  \item A comparison against the two baselines the original work uses:
+        standard-average FedNPG at $\Oh(d^2)$ and first-order FedPPO at
+        $\Oh(d)$ (Section~\ref{sec:baselines}).
+  \item Quantization of the agent-to-server transmissions, which is not part of
+        the original paper and constitutes the novel contribution of this
+        project (Section~\ref{sec:quantization}).
+\end{enumerate}
+
+Two of our results depart from what the original leads a reader to expect.
+Our measured communication saving on Swimmer is about half an order of
+magnitude smaller than the figure the authors quote, and on Humanoid,
+standard-average FedNPG, which computes exactly the direction FedNPG-ADMM
+approximates, finishes well below it. Section~\ref{sec:baselines} discusses
+both.

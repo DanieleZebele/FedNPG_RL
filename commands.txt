@@ -1,0 +1,106 @@
+FedNPG-ADMM-FedRL — comandi utili
+==================================
+
+0) Attivazione ambiente
+------------------------
+cd /mnt/FEDERATED/FedNPG-ADMM-FedRL
+source .venv/bin/activate
+
+1) Setup / installazione (solo la prima volta, o dopo modifiche a pyproject.toml)
+----------------------------------------------------------------------------------
+pip install -e . \
+  -e src/fedrl_comm/common \
+  -e src/fedrl_comm/baselines \
+  -e src/fedrl_comm/fednpg_admm \
+  -e src/fedrl_comm/quantization \
+  -e src/fedrl_comm/results_webapp \
+  -e src/fedrl_comm/results_exporter
+
+Verifica install:
+fedrl-train-admm --help
+fedrl-train-baseline --help
+fedrl-quantize-sweep --help
+fedrl-results-webapp --help
+fedrl-export-results --help
+
+2) Avviare un training — fednpg_admm (implementato, task ii)
+---------------------------------------------------------------
+fedrl-train-admm --env swimmer --num-agents 8 --seed 0
+
+Flag principali:
+  --env {swimmer,hopper,humanoid}   ambiente + default iperparametri (Tabella 4 del paper)
+  --num-agents N                    numero di agenti simulati (default 8)
+  --seed N                          (default 0)
+  --iterations, --timesteps, --rho, --delta, --gamma, --gae-lambda, --critic-lr, --eta
+                                     override dei default per-env
+  --cg-iters N                      iterazioni conjugate-gradient per agente (default 10)
+  --critic-epochs N                 epoche di fitting del critic per iterazione (default 5)
+  --results-path PATH               dove scrivere i run (default "results")
+  --run-id ID                       id di run custom (altrimenti auto-generato)
+  --device {cpu,mps,cuda:N}
+  --on-invalid-step {skip,raise}    comportamento se lo step del trust-region non è definito
+  --show-warnings                   non silenzia i warning di Gymnasium/etc.
+
+Esempi:
+  fedrl-train-admm --env swimmer --num-agents 8 --seed 0
+  fedrl-train-admm --env hopper --num-agents 8 --seed 0
+  fedrl-train-admm --env humanoid --num-agents 8 --seed 0
+  fedrl-train-admm --env swimmer --num-agents 2 --device cuda:0
+
+3) Avviare un training — baselines (NON ancora implementato, task iii)
+--------------------------------------------------------------------------
+fedrl-train-baseline --algo fednpg-standard --env swimmer --num-agents 8
+fedrl-train-baseline --algo fedppo --env swimmer --num-agents 8
+
+4) Sweep di quantizzazione (NON ancora implementato, task iv)
+------------------------------------------------------------------
+fedrl-quantize-sweep --algo fednpg-admm --env swimmer --bits 1,2,4,8,32
+
+4b) Griglia di test: seed x agenti x bit (scripts/run_grid.py)
+------------------------------------------------------------------
+cd /mnt/FEDERATED/FedNPG-ADMM-FedRL
+source .venv/bin/activate
+python scripts/run_grid.py --env humanoid --num-seeds 5 --agents 1,2,4,8 --bits 6,8 --device cuda:0 --rerun-partial
+
+  nomi run: hopper-N4-s2-q6  (N1 -> hopper-N1-s0, senza quantizzazione)
+  --dry-run          stampa solo la lista dei run
+  --bits none,5,6    'none' = baseline non quantizzata anche per N>1
+  --seed-start K     seed K..K+num-seeds-1 (default 0)
+  --scheme float     fp invece che stocastico (nomi -fp8 ecc.)
+  --rerun-partial    cancella e rilancia i run lasciati a metà
+  altri flag (--iterations, --device, ...) passano a fedrl-train-admm
+  i run già completi vengono saltati -> si può rilanciare dopo un'interruzione
+
+5) Monitorare i run in tempo reale (dashboard live)
+--------------------------------------------------------
+fedrl-results-webapp --results-path results
+# poi apri http://localhost:8050
+
+Con porta custom:
+fedrl-results-webapp --results-path results --port 8050
+
+6) Esportare tabelle/figure finali per il report (NON ancora implementato)
+--------------------------------------------------------------------------
+fedrl-export-results --results-path results/ --output-path report/assets/
+
+7) Monitoraggio manuale (senza dashboard)
+----------------------------------------------
+# lista dei run esistenti
+ls results/
+
+# seguire le metriche di un run in corso
+tail -f results/<run-id>/metrics.csv
+
+# vedere i metadati di un run
+cat results/<run-id>/metadata.json
+
+8) Note
+-------
+- torch è pinnato a 2.4.1 in fednpg_admm/pyproject.toml: su GPU Pascal/Volta
+  (compute capability < 7.5, es. TITAN Xp/TITAN V) serve questa versione,
+  altrimenti errore "CUDA error: no kernel image is available for execution
+  on the device". Verificare con:
+    python -c "import torch; print(torch.cuda.get_arch_list())"
+    nvidia-smi --query-gpu=compute_cap --format=csv
+- `pip install -e .` da solo NON funziona: serve passare tutti i path -e
+  dei sotto-pacchetti nello stesso comando (vedi punto 1).

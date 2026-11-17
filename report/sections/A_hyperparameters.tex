@@ -1,0 +1,51 @@
+% !TEX root = ../main.tex
+\section{Hyperparameters}
+\label{app:hyperparameters}
+
+\begin{table}[t]
+  \centering
+  \caption{Values transcribed from Table~4 of \citet{lan2023fednpgadmm}.
+  $\lambda_{\text{GAE}} = 0.95$ comes from the paper's setup text rather than
+  the table.}
+  \label{tab:table4}
+  \begin{tabular}{lrrr}
+    \toprule
+     & Swimmer-v4 & Hopper-v4 & Humanoid-v4 \\
+    \midrule
+    ADMM penalty $\rho$        & $0.1$   & $0.1$   & $0.01$ \\
+    Trust region $\delta$      & $0.01$  & $0.01$  & $0.01$ \\
+    Discount $\gamma$          & $0.99$  & $0.99$  & $0.99$ \\
+    Timesteps per iteration $T$& $2048$  & $1024$  & $512$ \\
+    Iterations $K$             & $1000$  & $2000$  & $3000$ \\
+    Learning rate (critic)     & $3\times10^{-4}$ & $3\times10^{-4}$ & $10^{-5}$ \\
+    Hidden layers              & $64\times64$ & $128\times128$ & $512^{3}$ \\
+    Hidden activation          & ReLU & ReLU & ReLU \\
+    Policy mean output         & Tanh & Tanh & Tanh \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{table}[t]
+  \centering
+  \caption{Settings not specified by the paper. Each follows the practical
+  basis the paper's setup section cites: TRPO with line search, and
+  stable-baselines3.}
+  \label{tab:ours}
+  \begin{tabular}{lll}
+    \toprule
+    Setting & Value & Basis \\
+    \midrule
+    Observation normalization & running mean/std, clip $10$ & SB3 \texttt{VecNormalize} \\
+    Reward normalization      & scale-only by running return std, clip $10$ & SB3 \texttt{VecNormalize} \\
+    Advantage normalization   & per agent, $(a-\mu)/(\sigma+10^{-8})$ & SB3 \\
+    Orthogonal initialization & $\sqrt{2}$ hidden, $0.01$ policy head, $1.0$ value head & SB3 \\
+    $\log\sigma$ initial      & $-0.5$ & tianshou, Spinning Up \\
+    $\log\sigma$ clamp        & $[-2.0,\, 0.5]$ & ours \\
+    Critic fitting            & 10 epochs, minibatch 64, Adam & SB3 PPO defaults \\
+    CG iterations / damping   & $10$ / $\rho$ & classic TRPO; damping $=\rho$ per line~8 \\
+    Line search               & 10 backtracks, shrink $0.8$ & TRPO \\
+    $\eta$                    & $1.0$ & not specified anywhere \\
+    Seeds                     & $0$--$4$ & --- \\
+    \bottomrule
+  \end{tabular}
+\end{table}

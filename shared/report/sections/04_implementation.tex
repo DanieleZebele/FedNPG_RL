@@ -1,0 +1,35 @@
+% !TEX root = ../main.tex
+\section{Implementation and experimental setup}
+\label{sec:implementation}
+
+We implemented FedNPG-ADMM from scratch in PyTorch, as no reference code is
+publicly available; ours is, at \url{https://github.com/edos08/FedNPG-ADMM-FedRL}. Federated training is simulated in one process with $N$
+agents, each with its own copy of the environment. Every agent-to-server
+transmission passes through a single channel that counts bytes at the
+paper's convention of 64 bits per value, although the tensors themselves
+are \texttt{float32}, so the three algorithms of
+Section~\ref{sec:baselines} are metered by the same code, and the quantizers
+of Section~\ref{sec:quantization} plug in at the same point.
+
+Hyperparameters follow Table~4 of the paper (Appendix~\ref{app:hyperparameters}).
+Two values are our own reading. The step multiplier $\eta$ depends on
+constants that are unknown for a neural policy (Theorem~\ref{thm:conv}), so we
+set $\eta = 1$ and take the ADMM step unscaled. Table~4's ``Learning rate''
+column we use as the critic's Adam learning rate, since the actor's step is
+fixed by the trust region.
+
+The paper trains with ``the practical settings in TRPO with line search and in
+stable-baselines3'', which Algorithm~\ref{alg:fednpgadmm} does not spell out.
+Swimmer and Humanoid use the standard versions: running observation and reward
+normalization, advantage normalization, orthogonal initialization, a
+backtracking line search and a clamp on $\log\sigma$ (Table~\ref{tab:ours}).
+Hopper needed adjustments specific to the environment: it runs without
+reward, advantage and observation normalization, line search and the
+$\log\sigma$ clamp, which keeps it closer to Algorithm~\ref{alg:fednpgadmm}
+as written. On each environment the baselines use the same settings as
+FedNPG-ADMM.
+
+Every configuration runs with five seeds. Following the paper, we report the
+average return of the episodes completed in each iteration's batch, plotted
+against iterations, and summarize a run by its mean over the last 100
+iterations.

@@ -1,0 +1,173 @@
+% !TEX root = ../main.tex
+\section{Baseline comparison}
+\label{sec:baselines}
+
+The original work compares three methods at $N = 8$: standard-average FedNPG
+\eqref{eq:stdfednpg}, FedNPG-ADMM, and first-order federated Proximal Policy Optimization (FedPPO) with clipping
+parameter $0.2$. We implement all three in the same codebase, holding
+everything except the server-side aggregation identical: same environments, normalization, GAE, critic and logged metrics. On Hopper all three
+methods use the reduced configuration of Section~\ref{sec:implementation}.
+
+\subsection{Standard-average FedNPG}
+
+This arm solves \eqref{eq:stdfednpg} exactly by conjugate gradient on the
+pooled Fisher, exploiting $\sum_i \bH_i v = N \cdot \bF_{\text{pooled}} v$.
+The solve is matrix-free, but the \emph{metering} is not: the channel is
+charged the full $d^2$ elements per agent per round.
+
+The obvious objection is that a baseline meant to pay an $\Oh(d^2)$ cost ought
+to pay it. Materializing $\sum_i \bH_i$ is impossible at Humanoid scale
+(Table~\ref{tab:commcost}: \SI{2.1}{\peta\byte}), so a literal implementation
+would not exist for the environment where the $\Oh(d^2)$ cost matters most.
+The claim under test concerns \emph{uplink bytes}, not server FLOPs; the paper
+measures ``the number of transmitted parameters with double precision in each
+agent''. We therefore compute the identical direction cheaply and report the
+true transmission cost. Without that metering the baseline would look as cheap as FedNPG-ADMM, and the
+comparison would measure nothing.
+
+\subsection{FedPPO}
+
+The paper names FedPPO and gives its clipping parameter, but specifies neither
+the aggregation scheme nor the local epoch count. We implement the
+FedAvg reading: each agent runs local PPO epochs from the broadcast $\bthe$
+and uplinks its parameter delta, and the server averages. The alternative, a
+single clipped-surrogate gradient step per round, would parallel
+Algorithm~\ref{alg:fednpgadmm}'s structure more neatly, but it strips PPO of
+the multi-epoch minibatch reuse that its clipping exists to make safe, so a
+comparison against it would not reflect PPO as it is normally run.
+
+\subsection{Communication cost, measured}
+
+\begin{table}[t]
+  \centering
+  \caption{Measured per-iteration uplink, Swimmer-v4 with four agents
+  ($d = \num{4868}$), at 64 bits per parameter. Measured values match the closed
+  form exactly.}
+  \label{tab:measuredcomm}
+  \begin{tabular}{llrr}
+    \toprule
+    Method & Transmitted & Bytes/iteration & Relative \\
+    \midrule
+    Standard-average FedNPG & $\bH_i$ ($d^2$) $+\ \bg_i$ & \num{758473344} & $2434\times$ \\
+    FedNPG-ADMM             & $\by_i,\ \bg_i$ (2 vectors) & \num{311552}   & $2\times$ \\
+    FedPPO                  & $\Delta\bthe_i$ (1 vector)  & \num{155776}   & $1\times$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+These measurements let us check the paper's headline saving. Per agent per
+round, FedNPG-ADMM transmits $\num{2434}$ times less than standard-average
+FedNPG on Swimmer and $\num{363537}$ times less on Humanoid
+(Table~\ref{tab:commcost}). \citet{lan2023fednpgadmm} report about six orders
+of magnitude on Humanoid, which matches, and four on Swimmer, where we measure
+$10^{3.4}$. Part of the gap is that FedNPG-ADMM sends two vectors per round,
+so the saving is about $d/2$ rather than $d$; the paper does not say how its
+own figure was computed.
+
+Table~\ref{tab:measuredcomm} also shows that FedNPG-ADMM is not the cheapest
+of the three methods, although the paper's framing invites a reader to assume
+it is. It is $\Oh(d)$, but with twice the constant of
+FedPPO, since it transmits two vectors per round where FedPPO transmits one.
+The argument for the method therefore rests on what it achieves per round
+rather than on what it costs per round, and a figure plotted against iterations
+cannot show that. We consequently plot reward against \emph{cumulative bytes},
+which is the axis on which the two effects can be read together.
+
+\subsection{Results}
+
+\begin{table}[t]
+  \centering
+  \caption{Final rewards at $N=8$, mean $\pm$ standard deviation across five
+  seeds, computed as in Table~\ref{tab:reproduction}. Hopper uses the
+  configuration of Section~\ref{sec:implementation} for all three methods.}
+  \label{tab:baselines}
+  \begin{tabular}{lrrr}
+    \toprule
+    Method & Swimmer-v4 & Hopper-v4 & Humanoid-v4 \\
+    \midrule
+    FedNPG-ADMM             & $128.4 \pm 0.8$ & $\mathbf{2656 \pm 286}$ & $\mathbf{6329 \pm 334}$ \\
+    Standard-average FedNPG & $127.1 \pm 0.5$ & $2494 \pm 677$ & $4699 \pm 298$ \\
+    FedPPO                  & $\mathbf{129.8 \pm 0.7}$ & $1571 \pm 588$ & $5780 \pm 158$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{figure}[t]
+  \centering
+  \begin{subfigure}[b]{0.49\textwidth}
+    \input{figures/baselines_iter_swimmer}
+    \caption{Swimmer-v4}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.49\textwidth}
+    \input{figures/baselines_iter_hopper}
+    \caption{Hopper-v4}
+  \end{subfigure}
+
+  \vspace{0.6em}
+  \begin{subfigure}[b]{0.49\textwidth}
+    \input{figures/baselines_iter_humanoid}
+    \caption{Humanoid-v4}
+  \end{subfigure}
+  \caption{The three methods at $N=8$ against iteration. Mean over five seeds,
+  band from minimum to maximum seed, smoothed as in
+  Figure~\ref{fig:convergence}. Colours as in the legend of panel (a).}
+  \label{fig:baselines-iter}
+\end{figure}
+
+\begin{figure}[t]
+  \centering
+  \begin{subfigure}[b]{0.49\textwidth}
+    \input{figures/baselines_bytes_swimmer}
+    \caption{Swimmer-v4}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.49\textwidth}
+    \input{figures/baselines_bytes_hopper}
+    \caption{Hopper-v4}
+  \end{subfigure}
+
+  \vspace{0.6em}
+  \begin{subfigure}[b]{0.49\textwidth}
+    \input{figures/baselines_bytes_humanoid}
+    \caption{Humanoid-v4}
+  \end{subfigure}
+  \caption{The same runs against cumulative uplink traffic across the
+  federation, on a logarithmic axis, at 64 bits per transmitted value.
+  Standard-average FedNPG sits three to six orders of magnitude to the right
+  because each agent uplinks its $d \times d$ Fisher matrix every round.
+  Colours as in the legend of panel (a).}
+  \label{fig:baselines-bytes}
+\end{figure}
+
+Table~\ref{tab:baselines} and Figure~\ref{fig:baselines-iter} compare the
+methods per iteration. On Swimmer the three are indistinguishable: they finish
+within three points of each other, and the environment saturates near $128$
+for every method, as it does for every agent count in
+Section~\ref{sec:reproduction}. On Hopper, FedNPG-ADMM and standard-average
+FedNPG agree to within the seed spread ($2656 \pm 286$ against
+$2494 \pm 677$), which is the paper's central empirical claim: the ADMM
+approximation costs no reward relative to the exact aggregation it replaces,
+here at $\num{9219}$ times less uplink per round. FedPPO finishes well below
+both, at $1571 \pm 588$.
+
+Humanoid departs from that pattern. Standard-average FedNPG, which computes
+exactly the pooled natural-gradient direction that FedNPG-ADMM approximates
+with a single ADMM round, finishes \emph{below} it, $4699 \pm 298$ against
+$6329 \pm 334$, a gap several times the seed spread. We have not established
+why. One candidate is that the single-round iterate is not a pure
+approximation: through the dual variables and the $\rho\, \by^{k-1}$ term of
+line~8, $\by^k$ carries information from previous iterations, which acts
+somewhat like momentum.
+
+Figure~\ref{fig:baselines-bytes} plots the same curves against uplink traffic. Against standard
+FedNPG the comparison is not close on any environment. Against FedPPO, which
+transmits half as much per round, the outcome depends on the environment. At
+the total traffic FedPPO uses over its whole run, FedNPG-ADMM has completed
+half as many iterations: on Swimmer both stand at about $128$; on Hopper
+FedNPG-ADMM is ahead ($2471$ against $1763$ on the smoothed curves); on
+Humanoid FedPPO is ahead ($5973$ against $5130$). Per byte, then, FedNPG-ADMM
+is not uniformly the better method. Its advantage over FedPPO is in reward per
+round, which it holds on Hopper and Humanoid, and the reduction it delivers is
+the one the paper claims, against the $\Oh(d^2)$ method it was designed to
+replace.

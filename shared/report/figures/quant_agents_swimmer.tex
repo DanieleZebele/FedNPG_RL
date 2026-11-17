@@ -1,0 +1,36 @@
+%% Final return against agent count under stochastic quantization, Swimmer-v4.
+%% Mean +- sd over five seeds; points offset horizontally for legibility.
+%% Data: figures/quant_agents_swimmer.dat (scripts/export_figures.py).
+\begin{tikzpicture}
+\begin{axis}[
+    xlabel={Agents $N$},
+    xmode=log, log basis x=2,
+    xtick={1,2,4,8}, xticklabels={1,2,4,8},
+    xmin=0.8, xmax=10,
+    width=0.96\linewidth,
+    height=0.78\linewidth,
+    ylabel={Final return},
+    ymin=110, ymax=135,
+    ytick distance=5,
+    ymajorgrids=true, xmajorgrids=true, grid style=dashed,
+    tick label style={font=\footnotesize},
+    label style={font=\footnotesize},
+    legend style={font=\footnotesize, cells={anchor=west}, anchor=south east, at={(0.99,0.02)}},
+]
+
+\addplot[colorA, line width=0.9pt, mark=*, mark size=1.6pt,
+    error bars/.cd, y dir=both, y explicit]
+    table[x expr=\thisrow{agents}*0.92, y=b64_mean, y error=b64_sd] {figures/quant_agents_swimmer.dat};
+\addlegendentry{64-bit (unquantized)};
+
+\addplot[colorB, line width=0.9pt, mark=square*, mark size=1.6pt,
+    error bars/.cd, y dir=both, y explicit]
+    table[x expr=\thisrow{agents}*1.0, y=b8_mean, y error=b8_sd] {figures/quant_agents_swimmer.dat};
+\addlegendentry{8-bit};
+
+\addplot[colorC, line width=0.9pt, mark=triangle*, mark size=1.6pt,
+    error bars/.cd, y dir=both, y explicit]
+    table[x expr=\thisrow{agents}*1.08, y=b6_mean, y error=b6_sd] {figures/quant_agents_swimmer.dat};
+\addlegendentry{6-bit};
+\end{axis}
+\end{tikzpicture}

@@ -1,0 +1,67 @@
+% !TEX root = ../main.tex
+\section{Discussion}
+\label{sec:discussion}
+
+\subsection{Hypotheses tested and refuted}
+
+Hopper's inverted scaling (Section~\ref{sec:hopper}) absorbed the larger part
+of our experimental effort. We record below the hypotheses that measurement
+subsequently refuted. They are worth setting out rather than omitting, both
+because each one narrows the space in which the remaining explanation must sit,
+and because the order in which they failed is informative about where the
+intuitions behind this method mislead.
+
+\begin{description}
+  \item[ADMM consensus quality.] At $N=8$ the agents' $\by_i$ are mutually
+    near-orthogonal (mean pairwise cosine $\approx 0.05$), and their average
+    retains only $\approx 0.57$ alignment with the true pooled natural-gradient
+    direction against $0.75$--$0.83$ for a single agent. Forcing consensus with five ADMM rounds per policy iteration raised the
+    cosine to $\approx 0.76$ and made performance \emph{worse}, and an exact
+    pooled solve, which has zero consensus error by construction, landed within
+    noise of one round. Consensus quality is not the bottleneck.
+  \item[Trust-region overshoot.] Line~12's closed-form step is exact only at
+    ADMM convergence, so with one round it could in principle overshoot. The
+    measured overshoot factor was $0.68$--$1.04$ and the achieved KL
+    $0.0054$--$0.0107$ against $\delta = 0.01$, so the step is mildly
+    \emph{conservative} at both $N=1$ and $N=8$.
+  \item[Architecture.] Table~4 mandates ReLU hidden layers and a Tanh-squashed
+    policy mean, whereas no reference implementation squashes the mean. Testing
+    all four combinations, the Table~4 configuration won, and removing the Tanh
+    alone was the worst. The natural gradient largely absorbs the
+    reparameterization, so the apparent gradient attenuation does not bite.
+  \item[Exploration noise.] Three interventions left the fall rate at
+    $9$--$12\%$ (Section~\ref{sec:variance}): releasing the log-std floor,
+    releasing the ceiling, and annealing the noise to a level at which a fixed
+    policy never falls.
+\end{description}
+
+The explanation that survives is the reward-structure argument of
+Section~\ref{sec:hopper}, which is consistent with the known tendency of
+MuJoCo survival bonuses to create local optima \citep{mania2018ars,
+reda2020locomote}.
+
+\subsection{Two observations we could not find in the literature}
+
+We located no published source for either of the following, and present them
+as our own measurements. First, a quantified failure rate and bimodal return
+distribution for a trained stochastic MuJoCo policy. The literature states
+that the episode ends when the robot falls, but not how often that happens to
+a converged policy. Second, per-dimension divergence of a Gaussian policy's
+$\log\sigma$: with the floor released, one action dimension collapsed to
+$0.056$ while another drifted up to $0.311$, leaving the mean unchanged. TRPO
+has no entropy term and the trust region bounds the KL of the joint
+distribution, so a dimension whose actions barely affect the advantage
+receives almost no gradient on its $\log\sigma$.
+
+\subsection{Threats to validity}
+
+Our study uses five seeds against the original's ten, so our error bars are
+wider than they appear relative to a ten-seed estimate. All runs use a single
+machine and a single software stack, so implementation-level differences from
+the authors' setup cannot be separated from algorithmic ones. That concern has
+precedent here: the same algorithm under identical hyperparameters has been
+shown to differ by more than a factor of two on Hopper across implementations
+\citep{henderson2018matters}. Finally, two hyperparameters ($\eta$ and the
+interpretation of Table~4's learning-rate column,
+Section~\ref{sec:implementation}) are our reading of an ambiguous source, and
+a different reading could change the Hopper conclusion in particular.

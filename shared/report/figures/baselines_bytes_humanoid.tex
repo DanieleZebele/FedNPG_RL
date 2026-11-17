@@ -1,0 +1,46 @@
+%% Figure 3 analogue, Humanoid-v4: three methods at N=8, mean over five seeds,
+%% band spans min to max seed.
+%% x is cumulative uplink across the federation (64 bits per value).
+%% Data: figures/baselines_humanoid.dat (scripts/export_figures.py).
+\begin{tikzpicture}
+\begin{axis}[
+    width=0.96\linewidth,
+    height=0.78\linewidth,
+    xlabel={Cumulative uplink (bytes)},
+    xmode=log,
+    ylabel={Average batch return},
+    ymin=0, ymax=8000,
+    ytick distance=2000,
+    scaled y ticks=base 10:-3,
+    ymajorgrids=true, xmajorgrids=true, grid style=dashed,
+    tick label style={font=\footnotesize},
+    label style={font=\footnotesize},
+    legend style={font=\footnotesize, cells={anchor=west},
+                  anchor=south east, at={(0.99,0.02)}},
+]
+
+\addplot[name path=admmblo, draw=none, forget plot]
+    table[x=admm_bytes, y=admm_lo] {figures/baselines_humanoid.dat};
+\addplot[name path=admmbhi, draw=none, forget plot]
+    table[x=admm_bytes, y=admm_hi] {figures/baselines_humanoid.dat};
+\addplot[colorA, opacity=0.15, forget plot] fill between[of=admmblo and admmbhi];
+\addplot[colorA, line width=0.9pt, forget plot]
+    table[x=admm_bytes, y=admm_mean] {figures/baselines_humanoid.dat};
+
+\addplot[name path=stdblo, draw=none, forget plot]
+    table[x=std_bytes, y=std_lo] {figures/baselines_humanoid.dat};
+\addplot[name path=stdbhi, draw=none, forget plot]
+    table[x=std_bytes, y=std_hi] {figures/baselines_humanoid.dat};
+\addplot[colorB, opacity=0.15, forget plot] fill between[of=stdblo and stdbhi];
+\addplot[colorB, line width=0.9pt, forget plot]
+    table[x=std_bytes, y=std_mean] {figures/baselines_humanoid.dat};
+
+\addplot[name path=ppoblo, draw=none, forget plot]
+    table[x=ppo_bytes, y=ppo_lo] {figures/baselines_humanoid.dat};
+\addplot[name path=ppobhi, draw=none, forget plot]
+    table[x=ppo_bytes, y=ppo_hi] {figures/baselines_humanoid.dat};
+\addplot[colorC, opacity=0.15, forget plot] fill between[of=ppoblo and ppobhi];
+\addplot[colorC, line width=0.9pt, forget plot]
+    table[x=ppo_bytes, y=ppo_mean] {figures/baselines_humanoid.dat};
+\end{axis}
+\end{tikzpicture}

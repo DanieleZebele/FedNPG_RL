@@ -1,0 +1,118 @@
+% !TEX root = ../main.tex
+\section{Background}
+\label{sec:background}
+
+\subsection{Setting}
+
+$N$ agents share a policy $\pi_{\bthe}$ with parameters $\bthe \in \Rb^d$ and
+each interacts with its own copy of the same Markov Decision Process (MDP) $(\mathcal{S}, \mathcal{A},
+P, r, \gamma)$. The objective is the usual expected discounted return
+\begin{equation}
+  J(\bthe) \;=\; \Exp_{\tau \sim \pi_{\bthe}}
+  \left[\textstyle\sum_{t=0}^{\infty} \gamma^{t} r(s_t, a_t)\right],
+\end{equation}
+and the federation seeks $\bthe^\star = \arg\max_{\bthe} J(\bthe)$ using every
+agent's samples while transmitting as little as possible.
+
+\subsection{Policy gradient}
+
+The policy gradient theorem \citep{williams1992reinforce, sutton2000pg}
+expresses the gradient of $J$ as an expectation over the policy's own
+trajectories,
+\begin{equation}
+  \nabla_{\bthe} J(\bthe) \;=\;
+  \Exp_{\tau \sim \pi_{\bthe}}\!\left[\textstyle\sum_{t}
+  \nabla_{\bthe} \log \pi_{\bthe}(a_t \mid s_t)\,
+  A^{\pi_{\bthe}}(s_t, a_t)\right],
+  \label{eq:pgt}
+\end{equation}
+where $A^{\pi}(s,a) = Q^{\pi}(s,a) - V^{\pi}(s)$ is the advantage of taking
+$a$ in $s$. Each agent estimates \eqref{eq:pgt} from its own batch
+$\mathcal{D}_i$ with the score-function estimator
+\begin{equation}
+  \bg_i \;=\; \frac{1}{|\mathcal{D}_i|}\sum_{\tau \in \mathcal{D}_i}\sum_{t}
+  \nabla_{\bthe}\log\pi_{\bthe}(a_t \mid s_t)\,\hat{A}_t ,
+  \label{eq:scorefn}
+\end{equation}
+which is line~7 of Algorithm~\ref{alg:fednpgadmm}. The advantages
+$\hat{A}_t$ come from Generalized Advantage Estimation (GAE)
+\citep{schulman2016gae}, an exponentially weighted sum of one-step temporal
+difference errors of a learned value function $V$,
+\begin{equation}
+  \hat{A}_t \;=\; \sum_{l \ge 0} (\gamma\lambda)^l\, \delta_{t+l},
+  \qquad
+  \delta_t \;=\; r_t + \gamma V(s_{t+1}) - V(s_t),
+\end{equation}
+where $\lambda \in [0,1]$ trades bias for variance. We use $\lambda = 0.95$,
+the value the paper states.
+
+\subsection{Natural policy gradient}
+
+Plain policy gradient ascends $\nabla_{\bthe} J$, which is sensitive to the
+parameterization. An equal step in parameter space can mean a negligible or a
+catastrophic change in the induced action distribution. NPG measures the step
+in distribution space instead. To second order, the average Kullback--Leibler
+(KL) divergence between the policy before and after a step $\Delta$ is a
+quadratic form in the Fisher information matrix,
+\begin{gather}
+  \Exp_s\!\left[\KL\big(\pi_{\bthe}(\cdot\mid s)\,\big\|\,
+                      \pi_{\bthe+\Delta}(\cdot\mid s)\big)\right]
+  \;\approx\; \tfrac12\,\Delta^{\top}\bF(\bthe)\,\Delta,
+  \label{eq:klquad}\\
+  \bF(\bthe) \;=\;
+  \Exp\!\left[\nabla_{\bthe} \log \pi_{\bthe}(a\mid s)\,
+              \nabla_{\bthe} \log \pi_{\bthe}(a\mid s)^{\top}\right].
+  \nonumber
+\end{gather}
+Maximizing the linearized objective $\bg^{\top}\Delta$ subject to
+$\tfrac12\Delta^{\top}\bF\Delta \le \delta$ gives the natural-gradient step
+\begin{equation}
+  \bthe \;\leftarrow\; \bthe + \alpha\, \bF^{-1}\bg,
+  \qquad
+  \alpha \;=\; \sqrt{\frac{2\delta}{\bg^{\top} \bF^{-1} \bg}} ,
+  \label{eq:npgstep}
+\end{equation}
+which is invariant to reparameterization and moves the policy by a KL
+divergence of $\delta$ per step \citep{kakade2001npg, schulman2015trpo}.
+Single-agent NPG, and Trust Region Policy Optimization (TRPO) with it, is
+matrix-free: \eqref{eq:npgstep} needs only $\bF^{-1}\bg$, which conjugate
+gradient computes from products $\bF v$, and each such product is a double
+backward pass through the KL divergence. $\bF$ is never formed.
+
+\subsection{The federated bottleneck}
+
+Federating NPG naively means forming the global direction from every agent's
+local gradient $\bg_i$ and local Fisher $\bH_i$:
+\begin{equation}
+  \bthe \leftarrow \bthe +
+  \sqrt{\frac{2N\delta}
+             {\big(\sum_{i} \bg_i\big)^{\!\top}
+              \big(\sum_{i} \bH_i\big)^{-1} \sum_{i} \bg_i}}
+  \left(\sum_{i=1}^{N} \bH_i\right)^{\!-1} \sum_{i=1}^{N} \bg_i .
+  \label{eq:stdfednpg}
+\end{equation}
+This is what \citet{lan2023fednpgadmm} call \emph{standard-average FedNPG}.
+The matrix-free trick no longer applies. The server needs each agent's $\bH_i$
+to form the sum, and no agent can evaluate a Fisher-vector product on
+another's data. Each agent must therefore uplink $\Oh(d^2)$ numbers per round.
+Table~\ref{tab:commcost} shows what that means concretely for the three
+environments studied here.
+
+\begin{table}[t]
+  \centering
+  \caption{Per-agent uplink per iteration, at the paper's convention of 64 bits
+  per transmitted parameter. $d$ is the policy parameter count for the
+  architectures in Table~\ref{tab:table4}. The dense Fisher is reported for
+  scale; it is never materialized in our implementation
+  (Section~\ref{sec:baselines}).}
+  \label{tab:commcost}
+  \begin{tabular}{lrrrr}
+    \toprule
+    Environment & $d$ & Dense $\bH_i$ & $\Oh(d^2)$ / $\Oh(d)$ & Order \\
+    \midrule
+    Swimmer-v4  & \num{4868}   & \SI{0.095}{\giga\byte} & \num{2434}   & $10^{3.4}$ \\
+    Hopper-v4   & \num{18438}  & \SI{1.36}{\giga\byte}  & \num{9219}   & $10^{4.0}$ \\
+    Humanoid-v4 & \num{727074} & \SI{2114}{\giga\byte}  & \num{363537} & $10^{5.6}$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}

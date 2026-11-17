@@ -1,0 +1,84 @@
+% !TEX root = ../main.tex
+\section{FedNPG-ADMM}
+\label{sec:method}
+
+\subsection{The key reformulation}
+
+The global direction in \eqref{eq:stdfednpg} is the stationary point of a
+quadratic problem that decomposes across agents:
+\begin{equation}
+  \by^{\star}
+  \;=\;\Big(\sum_i \bH_i\Big)^{\!-1}\sum_i \bg_i
+  \;=\;\arg\max_{\by}\;
+  \sum_{i=1}^{N}\Big(\bg_i^{\top}\by - \tfrac{1}{2}\by^{\top}\bH_i\by\Big).
+  \label{eq:qp}
+\end{equation}
+Each summand depends only on agent $i$'s own data. Introducing per-agent
+copies $\by_i$ with the consensus constraint $\by_i = \by$ for all $i$ turns
+\eqref{eq:qp} into a form consensus ADMM solves by alternating a local solve, a
+dual update and an average. The only quantities crossing the network are
+$d$-dimensional.
+
+\subsection{Algorithm}
+
+\begin{algorithm}[t]
+\caption{FedNPG-ADMM (Algorithm 1 of \citealp{lan2023fednpgadmm})}
+\label{alg:fednpgadmm}
+\begin{algorithmic}[1]
+  \State \textbf{Initialize} $\bthe^0$, $\by^0 = \mathbf{0}$,
+         $\by_i^0 = \by^0$, $\blam_i = \mathbf{0}$ for all $i$
+  \For{$k = 0, 1, \dots, K-1$}
+    \State Server broadcasts $\bthe^k$ and $\by^{k-1}$ to all agents
+    \For{each agent $i$ \textbf{in parallel}}
+      \State Collect a rollout of $T$ timesteps under $\pi_{\bthe^k}$
+      \State $\blam_i \leftarrow \blam_i + \rho\,(\by_i - \by^{k-1})$
+             \Comment{dual update}
+      \State $\bg_i \leftarrow \frac{1}{|\mathcal{D}_i|}\sum_{t}
+             \nabla_{\bthe}\log\pi_{\bthe}(a_t \mid s_t)\,\hat{A}_t$
+             \Comment{score-function gradient}
+      \State $\by_i \leftarrow (\bH_i + \rho I)^{-1}
+             (\bg_i - \blam_i + \rho\,\by^{k-1})$
+             \Comment{local solve, by conjugate gradient}
+      \State Send $\by_i, \bg_i$ to the server
+             \Comment{$\Oh(d)$}
+    \EndFor
+    \State $\by^{k} \leftarrow \frac{1}{N}\sum_{i} \by_i$
+    \State $\bthe^{k+1} \leftarrow \bthe^{k} +
+           \eta\sqrt{\dfrac{2N\delta}{(\sum_i \bg_i)^{\top}\by^{k}}}\;\by^{k}$
+  \EndFor
+\end{algorithmic}
+\end{algorithm}
+
+Line~8 is where the $\Oh(d)$ claim is earned. The local system $(\bH_i + \rho
+I)\by_i = \bg_i - \blam_i + \rho\by^{k-1}$ is solved by Conjugate Gradient (CG),
+which needs only Fisher-vector products on agent $i$'s own data, so $\bH_i$ is
+never formed. The $\rho I$ term is simultaneously the ADMM penalty and a
+Levenberg--Marquardt damping that keeps the system well-conditioned, so $\rho$
+plays two roles at once.
+
+\subsection{Why the step size carries \texorpdfstring{$N$}{N}}
+
+At exact consensus, $\by^k$ solves \eqref{eq:qp}, hence $(\sum_i
+\bg_i)^{\top}\by = \by^{\top}(\sum_i \bH_i)\by$. Constraining the
+\emph{average} per-agent KL to $\delta$ means
+$\tfrac12 \alpha^2 \by^{\top}\big(\tfrac{1}{N}\sum_i\bH_i\big)\by \le \delta$,
+which rearranges exactly to the $\sqrt{2N\delta/(\sum_i\bg_i)^\top\by}$ of
+line~12. The factor $N$ is therefore not a free scaling: it is what makes the
+trust region a statement about the average agent rather than the sum.
+
+\subsection{A property of the single-agent case}
+
+One consequence of Algorithm~\ref{alg:fednpgadmm} matters for interpreting
+$N=1$ results and is not remarked on in the original. With one agent, the
+broadcast consensus variable is that agent's own previous solve, $\by^{k-1} =
+\by_1^{k-1}$, so line~6 reads $\blam_1 \leftarrow \blam_1 + \rho(\by_1 -
+\by_1) = \blam_1$ and the dual variable never leaves its zero initialization.
+Algorithm~\ref{alg:fednpgadmm} at $N = 1$ therefore reduces exactly to
+\begin{equation}
+  \by \;=\; (\bH + \rho I)^{-1}\big(\bg + \rho\,\by^{k-1}\big),
+\end{equation}
+damped NPG with a momentum term, exercising none of the consensus machinery.
+We verified this numerically: $\|\blam_1\| = 0$ to machine precision at every
+iteration for $N=1$, and non-zero from the second iteration onwards for $N >
+1$. Any $N = 1$ number in this report, and in the original, should be read
+with that in mind.

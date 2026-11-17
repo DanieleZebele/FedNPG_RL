@@ -1,0 +1,73 @@
+% !TEX root = ../main.tex
+\section{Baseline comparison}
+\label{sec:baselines}
+
+The original work compares three methods at $N = 8$: standard-average FedNPG
+\eqref{eq:stdfednpg}, FedNPG-ADMM, and first-order federated Proximal Policy Optimization (FedPPO) with clipping
+parameter $0.2$. We implement all three in the same codebase, holding
+everything except the server-side aggregation identical: same environments,
+normalization, GAE, pooled critic and logged metrics. The comparison therefore
+measures the algorithms, not the surrounding machinery.
+
+\subsection{Standard-average FedNPG}
+
+This arm solves \eqref{eq:stdfednpg} exactly by conjugate gradient on the
+pooled Fisher, exploiting $\sum_i \bH_i v = N \cdot \bF_{\text{pooled}} v$.
+The solve is matrix-free, but the \emph{metering} is not: the channel is
+charged the full $d^2$ elements per agent per round.
+
+The obvious objection is that a baseline meant to pay an $\Oh(d^2)$ cost ought
+to pay it. Materializing $\sum_i \bH_i$ is impossible at Humanoid scale
+(Table~\ref{tab:commcost}: \SI{2.1}{\peta\byte}), so a literal implementation
+would not exist for the environment where the $\Oh(d^2)$ cost matters most.
+The claim under test concerns \emph{uplink bytes}, not server FLOPs; the paper
+measures ``the number of transmitted parameters with double precision in each
+agent''. We therefore compute the identical direction cheaply and report the
+true transmission cost. Dropping that metering would make FedNPG-ADMM appear
+free by comparison, and the experiment would measure nothing.
+
+\subsection{FedPPO}
+
+The paper names FedPPO and gives its clipping parameter, and specifies nothing further, neither the aggregation scheme nor the local
+epoch count. We implement the
+FedAvg reading: each agent runs local PPO epochs from the broadcast $\bthe$
+and uplinks its parameter delta, and the server averages. The alternative, a
+single clipped-surrogate gradient step per round, would parallel
+Algorithm~\ref{alg:fednpgadmm}'s structure more neatly, but it strips PPO of
+the multi-epoch minibatch reuse that its clipping exists to make safe. Beating
+that version would establish nothing. The choice is recorded in every run's
+metadata.
+
+\subsection{Communication cost, measured}
+
+\begin{table}[t]
+  \centering
+  \caption{Measured per-iteration uplink, Swimmer-v4 with four agents
+  ($d = \num{4868}$), at 64 bits per parameter. Measured values match the closed
+  form exactly.}
+  \label{tab:measuredcomm}
+  \begin{tabular}{llrr}
+    \toprule
+    Method & Transmitted & Bytes/iteration & Relative \\
+    \midrule
+    Standard-average FedNPG & $\bH_i$ ($d^2$) $+\ \bg_i$ & \num{758473344} & $2434\times$ \\
+    FedNPG-ADMM             & $\by_i,\ \bg_i$ (2 vectors) & \num{311552}   & $2\times$ \\
+    FedPPO                  & $\Delta\bthe_i$ (1 vector)  & \num{155776}   & $1\times$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+One consequence of Table~\ref{tab:measuredcomm} deserves emphasis, because the
+paper's framing invites a reader to assume otherwise: FedNPG-ADMM is not the
+cheapest of the three methods. It is $\Oh(d)$, but with twice the constant of
+FedPPO, since it transmits two vectors per round where FedPPO transmits one.
+The argument for the method therefore rests on what it achieves per round
+rather than on what it costs per round, and a figure plotted against iterations
+cannot show that. We consequently plot reward against \emph{cumulative bytes},
+which is the axis on which the two effects can be read together.
+
+\TODO{insert Figure 3 analogue -- reward vs iterations and reward vs cumulative
+bytes, three methods, N=8, three environments, five seeds -- once the 30
+baseline runs complete}
+
+\TODO{table of final rewards for the three methods at N=8}

@@ -1,0 +1,30 @@
+% !TEX root = ../main.tex
+Federated Natural Policy Gradient (FedNPG) inherits the fast convergence of
+Natural Policy Gradient (NPG) but
+requires every agent to uplink its local Fisher information matrix $\bH_i \in
+\Rb^{d\times d}$ each round. The resulting $\Oh(d^2)$ communication cost
+becomes prohibitive for deep policies. \citet{lan2023fednpgadmm} reformulate
+the global natural-gradient direction as a distributed quadratic program
+solved by the Alternating Direction Method of Multipliers (ADMM), so that
+each agent transmits only two $d$-dimensional vectors,
+an $\Oh(d)$ cost, at the same convergence rate. We reproduce that method from
+scratch in PyTorch and evaluate it on Swimmer-v4, Hopper-v4 and Humanoid-v4
+with $N \in \{1,2,4,8\}$ agents over five random seeds. On Swimmer we match
+the reported final rewards at two, four and eight agents and exceed them with
+one; on Humanoid the method scales from
+$993$ to $6329$ average return as agents increase from one to eight. On
+Hopper, with a reduced configuration closer to the algorithm as written, four
+and eight agents reach $2536$ and $2656$, within one standard deviation of the
+reported values, and learn faster than one or two. Against the two baselines at eight agents, FedNPG-ADMM matches
+standard-average FedNPG on Hopper and exceeds it on Humanoid. We further
+quantify the communication
+saving directly, measuring reductions by factors of $2.4\times 10^{3}$,
+$9.2\times 10^{3}$ and $3.6\times 10^{5}$ in transmitted parameters per agent
+per round on the three environments.
+Finally, we quantize the two vectors each agent transmits, which the original
+work does not attempt. Across five seeds, 8-bit stochastic quantization keeps
+the final reward within the seed spread and the faster learning with more
+agents on all three environments, for a further fourfold reduction in uplink against the
+\texttt{float32} values exchanged (eightfold at the paper's 64-bit
+accounting); at 6 bits Humanoid
+collapses at every agent count.

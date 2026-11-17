@@ -1,0 +1,36 @@
+%% Uplink of one whole training run at N=8, summed over agents, by bit width.
+%% Measured cumulative_comm_bytes, identical across seeds. Log scale. The
+%% unquantized run is shown as metered at the paper's 64 bits per value and
+%% at the float32 it actually exchanges (half of it).
+%% Data: figures/quant/quant_overhead.dat (scripts/export_quant_curves.py).
+\begin{tikzpicture}
+\begin{axis}[
+    ybar, bar width=8pt,
+    width=0.62\textwidth, height=0.38\textwidth,
+    symbolic x coords={Swimmer,Hopper,Humanoid},
+    xtick=data,
+    enlarge x limits=0.25,
+    ymode=log, ymin=0.01, ymax=5000,
+    log origin=infty,
+    ylabel={Uplink per run at $N=8$ (GB)},
+    ymajorgrids=true, grid style=dashed,
+    tick label style={font=\footnotesize},
+    label style={font=\footnotesize},
+    point meta=rawy,
+    nodes near coords={\pgfmathprintnumber[fixed, precision=2]{\pgfplotspointmeta}},
+    nodes near coords style={font=\tiny, rotate=90, anchor=west},
+    legend style={font=\footnotesize, legend columns=2, draw=none, cells={anchor=west},
+                  at={(0.5,1.02)}, anchor=south,
+                  /tikz/every even column/.append style={column sep=0.8em}},
+    legend image code/.code={\draw[#1] (0cm,-0.1cm) rectangle (0.2cm,0.12cm);},
+]
+\addplot[draw=colorA, dashed, fill=colorA!15] table[x=env, y=b64] {figures/quant/quant_overhead.dat};
+\addlegendentry{Unquantized, 64-bit accounting (original paper)}
+\addplot[draw=colorA, fill=colorA!60] table[x=env, y=fp32] {figures/quant/quant_overhead.dat};
+\addlegendentry{Unquantized, float32}
+\addplot[draw=colorB, fill=colorB!60] table[x=env, y=b8] {figures/quant/quant_overhead.dat};
+\addlegendentry{8 bits}
+\addplot[draw=colorC, fill=colorC!60] table[x=env, y=b6] {figures/quant/quant_overhead.dat};
+\addlegendentry{6 bits}
+\end{axis}
+\end{tikzpicture}

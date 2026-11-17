@@ -1,0 +1,197 @@
+% !TEX root = ../main.tex
+% Flush the baseline figures of Section 6 before this section starts.
+\FloatBarrier
+\section{Quantizing the agent-to-server transmissions}
+\label{sec:quantization}
+
+FedNPG-ADMM reduces communication by shrinking \emph{what} is transmitted from
+a matrix to two vectors. A second axis, which the original work does not
+explore, is to shrink \emph{how precisely} those vectors are transmitted. The
+original paper reports overhead at 64 bits per parameter, and our byte counter follows
+it, although the vectors our implementation exchanges are \texttt{float32}.
+Compression ratios below are therefore given against both references: the
+paper's 64-bit accounting and the 32 bits actually sent. If performance
+survives at 8 or 4 bits, the saving compounds with the $\Oh(d^2) \to \Oh(d)$
+one.
+
+This is the novel contribution of the project. The precedent is Q-GADMM
+\citep{elgabli2021qgadmm}, which \citet{lan2023fednpgadmm} cite themselves, and
+which quantizes the vectors an ADMM scheme transmits in the \emph{supervised}
+setting. We carry that idea into the reinforcement learning setting, where the
+transmitted vectors are gradient and consensus directions computed from a
+non-stationary sampling distribution. We found no prior work quantizing
+agent-to-server transmissions for federated policy gradient with
+continuous-control experiments. The nearest results are for compressed temporal
+difference learning with linear function approximation
+\citep{mitra2024compressedtd}, which is theory-only and not policy gradient.
+
+\subsection{Design}
+
+A quantizer acts on each vector an agent sends to the server. It maps the
+vector to $b$ bits per entry, reconstructs it on arrival, and declares the bit
+width the transmission would have needed. It sits entirely on the
+communication channel, so the algorithm itself is unchanged.
+
+Two properties make the experiment measure something. The degraded tensor is
+what the server aggregates, because downstream code uses the return value of
+\texttt{send} and never the original, so the quantization error enters the
+update to $\bthe$. And the declared bit width is what the
+byte meter uses, so the cost axis moves with the fidelity. Per iteration, with
+$R$ ADMM rounds, $N$ agents and $b$ bits, the uplink is
+\begin{equation}
+  \text{bytes} \;=\; N \,(1 + R)\, d \, b / 8,
+  \label{eq:quantbytes}
+\end{equation}
+since $\bg_i$ is sent once per iteration and $\by_i$ once per round. Measured
+byte counts match \eqref{eq:quantbytes} exactly; Figure~\ref{fig:quantoverhead}
+shows what they add up to over a full training run.
+
+\paragraph{Stochastic uniform quantization.} For a tensor $x$ at $b$ bits, with
+$L = 2^b - 1$ levels and step $s = (\max x - \min x)/L$, the value is placed at
+$\lfloor u \rfloor + \mathrm{Bernoulli}(u - \lfloor u \rfloor)$ where
+$u = (x - \min x)/s$. Rounding stochastically instead of to nearest makes the
+estimator unbiased, $\Exp[\hat{x}] = x$, with per-element variance at most
+$s^2/4$. That property is the reason to prefer it here: a deterministic
+rounding error is systematic and would accumulate across iterations, whereas an
+unbiased one leaves the server receiving the correct gradient and consensus
+direction in expectation. The quantizer draws from a dedicated
+\texttt{torch.Generator} rather than the global stream, so runs at different
+bit widths see identical action-sampling sequences and differ only in the
+quantization.
+
+\subsection{Results}
+
+The main experiment is a five-seed grid: stochastic quantization at 8 and 6
+bits, for $N \in \{2,4,8\}$, on all three environments (90 runs). One agent has
+no uplink to quantize, so $N=1$ is unquantized throughout. Each environment
+runs in its own configuration (Section~\ref{sec:implementation}), and the
+quantized runs use the same settings and seeds as the unquantized runs they
+are compared against: the single-agent Swimmer runs of the two code bases agree to the last
+logged digit. Table~\ref{tab:quantgrid} and Figure~\ref{fig:quant} give the
+results; a finer single-seed scan over bit widths at $N=8$ locates the
+threshold more precisely.
+
+\begin{table}[t]
+  \centering
+  \caption{Final reward under stochastic quantization, mean $\pm$ standard
+  deviation across five seeds, computed as in Table~\ref{tab:reproduction}.
+  The unquantized column exchanges \texttt{float32} values; 8 and 6 bits cut
+  the uplink per iteration by $4\times$ and $5.3\times$ against it, or $8\times$
+  and $10.7\times$ at the paper's 64-bit accounting. The unquantized column
+  is the corresponding row of Table~\ref{tab:reproduction}.}
+  \label{tab:quantgrid}
+  \begin{tabular}{llrrr}
+    \toprule
+    Environment & $N$ & Unquantized & 8-bit & 6-bit \\
+    \midrule
+    \multirow{3}{*}{Swimmer-v4}
+      & 2 & $126.0 \pm 1.3$ & $126.1 \pm 0.8$ & $128.9 \pm 7.4$ \\
+      & 4 & $127.0 \pm 0.8$ & $127.1 \pm 0.5$ & $125.8 \pm 3.4$ \\
+      & 8 & $128.4 \pm 0.8$ & $128.6 \pm 0.4$ & $127.8 \pm 0.7$ \\
+    \midrule
+    \multirow{3}{*}{Humanoid-v4}
+      & 2 & $3391 \pm 796$ & $2956 \pm 593$ & $497 \pm 34$ \\
+      & 4 & $5343 \pm 121$ & $5244 \pm 237$ & $676 \pm 73$ \\
+      & 8 & $6329 \pm 334$ & $5997 \pm 259$ & $1514 \pm 526$ \\
+    \midrule
+    \multirow{3}{*}{Hopper-v4}
+      & 2 & $1636 \pm 282$ & $2052 \pm 389$ & $1941 \pm 461$ \\
+      & 4 & $2536 \pm 116$ & $2197 \pm 533$ & $2096 \pm 243$ \\
+      & 8 & $2656 \pm 286$ & $2581 \pm 466$ & $2590 \pm 338$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{figure}[tbp]
+  \centering
+  \pgfplotslegendfromname{quantlegend}\par\medskip
+  \input{figures/quant/quant_curves}
+  \caption{Return over training, unquantized (\texttt{float32}) and under
+  stochastic quantization at 8 and 6 bits. Rows: environments; columns: number of agents
+  $N$. Lines are the mean over five seeds, smoothed with a centred 21-iteration
+  rolling mean; bands span the minimum to the maximum across seeds. Hopper
+  uses its own configuration (Section~\ref{sec:implementation}) in all three
+  series, Swimmer and Humanoid the original one.}
+  \label{fig:quant}
+\end{figure}
+
+\begin{figure}[tbp]
+  \centering
+  \input{figures/quant/quant_overhead}
+  \caption{Uplink of one complete training run at $N=8$, summed over agents;
+  log scale. The unquantized run is shown both as metered, at the original paper's 64
+  bits per value, and at the \texttt{float32} it actually exchanges, half of
+  that. Measured byte counts, identical across seeds. Eight and six bits cut
+  the uplink by $4\times$ and $5.3\times$ against \texttt{float32}, or $8\times$
+  and $10.7\times$ against the 64-bit accounting, on every environment; the
+  totals scale linearly with $N$.}
+  \label{fig:quantoverhead}
+\end{figure}
+
+\paragraph{Eight bits preserve the result.} On Swimmer, 8-bit and unquantized
+runs are indistinguishable at every agent count. On Humanoid, 8 bits stays
+within one standard deviation of the unquantized result at $N=2$ and $N=4$
+and finishes $5\%$ lower at $N=8$ ($5997 \pm 259$ against $6329 \pm 334$),
+also about one standard deviation. Learning still speeds up with the number of
+agents, which is the paper's claim: at iteration 1000 the
+smoothed Humanoid return at 8 bits is $580$, $905$ and $3428$ for $N = 2, 4,
+8$, against $602$, $944$ and $3863$ unquantized, and the same ordering holds at
+every checkpoint on both environments. Eight bits therefore removes a further
+factor of four from the uplink against the \texttt{float32} values actually
+exchanged (eight at the paper's 64-bit accounting), on top of the
+$\Oh(d^2) \to \Oh(d)$ reduction, without giving up either the final reward or the scaling with $N$.
+
+\paragraph{Six bits are too few.} On Humanoid, 6 bits collapses at every agent
+count, to $497$, $676$ and $1514$. Five seeds put this beyond seed variance and
+confirm the threshold the single-seed scan found (5543 at 7 bits, 1991 at
+6). The ordering in $N$ survives, at about a quarter of the
+return. Swimmer's final values hold at 6 bits, but the cost shows elsewhere:
+the seed spread at $N=2$ and $N=4$ grows from about $1$ to $7.4$ and $3.4$,
+and early in training four agents learn \emph{slower} than two (smoothed return
+$75$ against $95$ at iteration 100), so the faster-with-more-agents ordering
+is lost before it is recovered at convergence.
+
+\paragraph{Where the threshold sits.} The single-seed scan at $N=8$ shows
+a sharp threshold rather than a gradual decay. Swimmer is flat from 6 to 32
+bits and collapses to $94.4$ at 5; Humanoid holds $5542.6$ at 7 bits and falls
+to $1990.5$ at 6. The threshold moves in the direction $d$ does, which is what
+an unbiased quantizer predicts. The variance injected per element is bounded by
+$s^2/4$ and enters a $d$-dimensional sum, so Humanoid's policy
+($d \approx 7.3\times10^{5}$) needs one bit more than Swimmer's
+($d = \num{4868}$) before the aggregated direction stops degrading. Two
+environments do not test that reading, and a scan on a fourth would. Taken
+together with the five-seed grid, 8 bits is the operating point that holds on
+every environment we tested; 7 bits on Humanoid and 6 on Swimmer are
+plausible but rest on single seeds or show degraded early learning.
+
+\paragraph{Hopper.} Hopper tolerates quantization better than Humanoid. At
+$N=8$ both bit widths finish within the seed spread of the unquantized runs
+($2581 \pm 466$ at 8 bits and $2590 \pm 338$ at 6, against $2656 \pm 286$),
+and 6 bits does not collapse as it does on Humanoid. At $N=4$ both quantized
+runs finish lower ($2197$ and $2096$ against $2536$), by about one standard
+deviation at 8 bits and more at 6; at $N=2$ they finish higher. The final
+reward still increases with $N$ at both bit widths ($2052$, $2197$, $2581$ at
+8 bits; $1941$, $2096$, $2590$ at 6), so the scaling with the number of agents
+survives quantization here too.
+
+\subsection{What the byte counts omit}
+
+The reported bytes are $d \cdot b / 8$ per transmission and exclude the
+quantization metadata a real deployment would also send: $\min x$ and the scale
+for the stochastic scheme (two \texttt{float32}, 64 bits per transmission).
+Relative to a $d \cdot b$-bit payload the
+overhead is $64/(d\,b)$, so roughly $1$--$3\%$ in the worst case here ($b=1$, $d$
+of a few thousand) and below $0.5\%$ at 8 bits. The downlink broadcast of
+$\bthe$ and $\by$ is not counted either, for the same reason it is not counted
+in the paper. Neither omission changes the ordering between bit widths, but
+both make the reported compression slightly optimistic.
+
+\paragraph{Quantizing the baseline instead.} A symmetric comparison would
+quantize standard-average FedNPG's $\bH_i$ as well. It does not change the
+conclusion, and the arithmetic shows why without an experiment. At $b$ bits the
+standard method uplinks about $d^2 b$ bits per agent per round, against
+$2 \cdot 64\, d$ for unquantized FedNPG-ADMM, so the two break even only at
+$b \approx 128/d$, or $64/d$ against \texttt{float32}. On Swimmer that is at
+most $0.03$ bits, and smaller still on the
+larger policies: no bit width makes the $\Oh(d^2)$ method competitive, and
+quantizing FedNPG-ADMM widens the gap further.

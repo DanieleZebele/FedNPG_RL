@@ -48,6 +48,10 @@ DEFAULT_HYPERPARAMS: dict[str, HyperParams] = {
         rho=0.1, delta=0.01, gamma=0.99, gae_lambda=0.95,
         timesteps=1024, iterations=2000, critic_lr=3e-4,
     ),
+    # "hopper": HyperParams(
+    #     rho=0.1, delta=0.005, gamma=0.99, gae_lambda=0.95,
+    #     timesteps=1024, iterations=10000, critic_lr=3e-4, eta=0.6
+    # ),
     "humanoid": HyperParams(
         rho=0.01, delta=0.01, gamma=0.99, gae_lambda=0.95,
         timesteps=512, iterations=3000, critic_lr=1e-5,

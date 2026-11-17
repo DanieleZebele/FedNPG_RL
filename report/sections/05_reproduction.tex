@@ -1,0 +1,181 @@
+% !TEX root = ../main.tex
+\section{Reproduction results}
+\label{sec:reproduction}
+
+We run $N \in \{1,2,4,8\}$ on Swimmer-v4, Hopper-v4 and Humanoid-v4 with five
+random seeds per configuration (60 runs). Table~\ref{tab:reproduction} reports
+the mean of each seed's final 100 iterations, then the mean and standard
+deviation across seeds, the same quantity Table~2 of the original reports.
+
+\begin{table}[t]
+  \centering
+  \caption{Final rewards, mean $\pm$ standard deviation across five seeds.
+  Original values are from Table~2 of \citet{lan2023fednpgadmm}, computed over
+  ten seeds. Humanoid does not appear in their Table~2.}
+  \label{tab:reproduction}
+  \begin{tabular}{llrrrr}
+    \toprule
+    Environment & Source & $N=1$ & $N=2$ & $N=4$ & $N=8$ \\
+    \midrule
+    \multirow{2}{*}{Swimmer-v4}
+      & Ours  & $\mathbf{123.9 \pm 2.3}$ & $126.0 \pm 1.3$ & $127.0 \pm 0.8$ & $\mathbf{128.4 \pm 0.8}$ \\
+      & Paper & $109.4 \pm 5.9$  & $123.6 \pm 10.3$ & $127.2 \pm 2.2$ & $128.5 \pm 1.9$ \\
+    \midrule
+    \multirow{2}{*}{Hopper-v4}
+      & Ours  & $\mathbf{2497 \pm 635}$ & $2140 \pm 386$ & $1658 \pm 273$ & $1605 \pm 159$ \\
+      & Paper & $1473 \pm 383$ & $2384 \pm 371$ & $2507 \pm 230$ & $2719 \pm 173$ \\
+    \midrule
+    Humanoid-v4
+      & Ours  & $993 \pm 187$ & $3391 \pm 796$ & $5343 \pm 121$ & $\mathbf{6329 \pm 334}$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{figure}[t]
+  \centering
+  \begin{subfigure}[b]{0.49\textwidth}
+    \input{figures/convergence_swimmer}
+    \caption{Swimmer-v4}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.49\textwidth}
+    \input{figures/convergence_hopper}
+    \caption{Hopper-v4}
+  \end{subfigure}
+
+  \vspace{0.6em}
+  \begin{subfigure}[b]{0.49\textwidth}
+    \input{figures/convergence_humanoid}
+    \caption{Humanoid-v4}
+  \end{subfigure}
+  \caption{Convergence for each agent count. The solid line is the mean over five
+  seeds and the shaded band spans the minimum and maximum seed, so the band
+  shows the full observed range and not a modelled interval. Curves are
+  smoothed with a centred 21-iteration rolling mean before aggregation,
+  following \citet{spinningup}, who smooth the same quantity over eleven
+  epochs. Swimmer and Humanoid separate cleanly by agent count. On Hopper the
+  bands overlap throughout and the ordering reverses, which is the visual form
+  of the result discussed in Section~\ref{sec:hopper}.}
+  \label{fig:convergence}
+\end{figure}
+
+\begin{figure}[t]
+  \centering
+  \begin{subfigure}[b]{0.49\textwidth}
+    \input{figures/communication_swimmer}
+    \caption{Swimmer-v4}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.49\textwidth}
+    \input{figures/communication_hopper}
+    \caption{Hopper-v4}
+  \end{subfigure}
+
+  \vspace{0.6em}
+  \begin{subfigure}[b]{0.49\textwidth}
+    \input{figures/communication_humanoid}
+    \caption{Humanoid-v4}
+  \end{subfigure}
+  \caption{The same runs plotted against cumulative uplink traffic instead of
+  iteration count, on a logarithmic axis. The horizontal axis is the total
+  across the federation: each agent transmits $2d$ values per iteration
+  whatever $N$ is, so a per-agent axis would place all four series on top of
+  one another, and that invariance is the $\Oh(d)$ property itself. Read this
+  way the figure prices the extra agents, and the curves shift right as $N$
+  grows.}
+  \label{fig:communication}
+\end{figure}
+
+\subsection{Swimmer: reproduced}
+
+Figure~\ref{fig:convergence}(a) shows the curves behind the Swimmer column, and
+Figure~\ref{fig:communication}(a) the same runs against uplink traffic.
+Our numbers fall within the reported confidence intervals at every agent
+count, they are monotone in $N$ as the paper describes, and their seed variance
+is in fact \emph{tighter} than the original's at every count, by a factor of
+roughly two at both ends ($\pm 2.3$ against $\pm 5.9$ at $N=1$, $\pm 0.8$
+against $\pm 1.9$ at $N=8$). At $N=1$ we also exceed the reported mean, $123.9$
+against $109.4$. On this environment we therefore regard the result as
+reproduced without qualification.
+
+The variance does still fall with $N$, from $\pm 2.3$ at one agent to $\pm 0.8$
+at eight, which is the direction the paper reports. The effect is modest here
+because every seed converges: none of the five single-agent runs falls into the
+local optimum Swimmer is known for, so there is no failure mode for the extra
+agents to suppress. Humanoid in Section~\ref{sec:humanoid} shows the same claim
+with far more room to act.
+
+\subsection{Humanoid: strong scaling}
+\label{sec:humanoid}
+
+Humanoid is absent from the original Table~2, so we have no direct comparison.
+The qualitative claim nevertheless holds, since return grows $6.4\times$ from $N=1$ to $N=8$,
+monotonically, with the $N=4$ and $N=8$ variance small relative to the mean.
+
+\subsection{Hopper: not reproduced}
+\label{sec:hopper}
+
+Hopper is the one environment where our result contradicts the original. Our
+$N=1$ \emph{exceeds} the reported value ($2497$ against $1473$), but
+performance then \emph{decreases} monotonically with more agents, ending at
+$1605$ where the paper reports $2719$. The trend is inverted.
+
+Section~\ref{sec:discussion} lists the aggregation hypotheses we tested and
+refuted. The explanation consistent with the evidence is a
+speed-versus-survival trade-off specific to Hopper's reward structure.
+Table~\ref{tab:hopper} shows that the runs with more agents earn \emph{more}
+reward per timestep while surviving \emph{fewer} timesteps: they converge to a
+faster, less stable gait.
+
+\begin{table}[t]
+  \centering
+  \caption{Hopper-v4: reward per step against episode length, final 100
+  iterations. More agents yield a faster gait that falls sooner.}
+  \label{tab:hopper}
+  \begin{tabular}{lrrr}
+    \toprule
+    Configuration & Reward/step & Episode length & Return \\
+    \midrule
+    $N=1$ (best seed) & $3.76$ & $779$ & $2928$ \\
+    $N=2$ & $4.20$ & $372$ & $1562$ \\
+    $N=4$ & $4.27$ & $384$ & $1638$ \\
+    $N=8$ & $\mathbf{4.49}$ & $\mathbf{368}$ & $1652$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+Hopper's \texttt{healthy\_reward} is $1.0$ per surviving step, small relative
+to its forward-velocity reward, so a gait that runs fast and falls at step
+$\sim$400 is a local optimum. Humanoid's \texttt{healthy\_reward} is $5.0$,
+which aligns survival with scoring, and there reward per step and episode
+length rise
+\emph{together} with $N$ ($5.70 \to 7.09$ and $206 \to 874$). The mechanism we propose is that additional agents reduce gradient noise, and
+with it the implicit exploration that noise supplies. Whether the loss of that
+exploration helps or hurts then depends on which basin the now more decisive
+optimizer settles into. On Swimmer and Humanoid it steers away from the poor
+optimum, and the seed variance falls accordingly; on Hopper it steers into one.
+The same property of the method therefore produces the paper's result on two
+environments and the opposite on the third.
+
+\subsection{On the variance of the reported metric}
+\label{sec:variance}
+
+Single-seed Hopper and Humanoid curves swing between roughly $1000$ and $3700$
+from one iteration to the next, while Swimmer's are flat to within $2\%$. This
+is not instability of the algorithm. Swimmer-v4 has no termination condition
+at all, and \citet{gymnasium} state that ``the Swimmer never terminates'', so
+every episode runs exactly $1000$ steps. Hopper and Humanoid terminate when
+the robot falls, which makes return approximately affine in survival time and
+the per-batch mean a draw from a two-component mixture: roughly $58\%$ of
+episodes reach the time limit near $3700$, while $9\%$ fall early below
+$2000$. With one to two episodes per plotted point, the swing is the expected
+behaviour of the estimator. The same policy evaluated deterministically scores
+$3749 \pm 4$ and almost never falls.
+
+We verified that the swing cannot be tuned away. Removing the
+exploration-noise floor, removing the ceiling, and annealing the noise to a
+level at which a fixed policy provably never falls all left the fall rate at
+$9$--$12\%$. A policy trained at lower noise re-optimizes to a correspondingly
+more marginal gait, so the failure rate is an equilibrium of the objective
+rather than a function of the noise level. A never-falling policy would score
+lower in expectation.

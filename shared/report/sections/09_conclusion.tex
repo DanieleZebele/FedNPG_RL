@@ -1,0 +1,38 @@
+% !TEX root = ../main.tex
+\section{Conclusion}
+\label{sec:conclusion}
+
+We reproduced FedNPG-ADMM from scratch and evaluated it across three MuJoCo
+environments, four agent counts and five seeds. Swimmer reproduces the
+reported final rewards at two, four and eight agents and exceeds them with one,
+monotone in $N$, and Humanoid scales
+$6.4\times$ from one agent to eight. On Hopper, with a reduced configuration closer to the algorithm as written,
+four and eight agents match the reported rewards and learn faster than one or
+two, while one and two remain indistinguishable from each other. Against the baselines at eight agents,
+FedNPG-ADMM matches standard-average FedNPG on Hopper and exceeds it on
+Humanoid, at three to six orders of magnitude less uplink.
+
+We measured the communication argument directly instead of assuming it,
+obtaining per-agent per-round reductions of $2434\times$, $9219\times$ and
+$363537\times$ on the three environments. FedNPG-ADMM is not the cheapest of
+the compared methods in absolute terms, since it transmits twice what FedPPO
+does, so its case rests on convergence per round.
+
+Quantizing the agent-to-server transmissions, which the original work does not
+attempt, costs little at 8 bits. Across five seeds, all three environments
+keep their final reward within the seed spread and their faster learning with
+more agents,
+for a further $4\times$ against the \texttt{float32} values exchanged
+($8\times$ at the paper's 64-bit accounting) on top of the
+$\Oh(d^2) \to \Oh(d)$ reduction. Below a
+threshold that grows with the policy dimension the collapse is abrupt rather
+than graceful: Humanoid fails at 6 bits at every agent count, while Swimmer
+holds its final values there but loses the agent-count ordering early in
+training, and Hopper still reaches its unquantized result at $N=8$.
+
+\paragraph{Limitations and future work.} The missing axis is communication
+\emph{frequency}. FedNPG-ADMM optimizes what is transmitted per round, while
+FedAvg-style schemes with $E$ local steps optimize how often rounds occur
+\citep{jin2022fedrlheterogeneity, khodadadian2022linearspeedup}. The two are
+orthogonal and could be combined. A second open question is the Humanoid gap between FedNPG-ADMM and the exact
+aggregation it approximates (Section~\ref{sec:baselines}).

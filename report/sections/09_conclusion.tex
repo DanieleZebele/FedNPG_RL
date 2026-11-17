@@ -1,0 +1,40 @@
+% !TEX root = ../main.tex
+\section{Conclusion}
+\label{sec:conclusion}
+
+We reproduced FedNPG-ADMM from scratch and evaluated it across three MuJoCo
+environments, four agent counts and five seeds. Swimmer reproduces the
+reported final rewards at every agent count, monotone in $N$ and with tighter
+seed variance than the original throughout, and Humanoid scales
+$6.4\times$ from one agent to eight. Hopper does not reproduce. Our
+single-agent result exceeds the published value, performance then decreases
+with more agents, and we attribute this to a speed-versus-survival local
+optimum that Hopper's small per-step survival bonus makes attractive and that
+reduced gradient noise makes easier to fall into.
+
+We measured the communication argument directly instead of assuming it,
+obtaining per-agent per-round reductions of $2434\times$, $9219\times$ and
+$363537\times$ on the three environments. FedNPG-ADMM is not the cheapest of
+the compared methods in absolute terms, since it transmits twice what FedPPO
+does, so its case rests on convergence per round.
+
+Quantizing the agent-to-server transmissions, which the original work does not
+attempt, removes most of what remains of that cost. At 8 bits the uplink falls
+by $8\times$ on every environment and agent count, with final rewards inside
+one standard deviation of the unquantized runs over five seeds; on Humanoid
+that is \SI{244}{\giga\byte} less traffic per $N=8$ run. Compounded with the
+$\Oh(d^2) \to \Oh(d)$ reduction it reaches $1.9\times 10^{4}$,
+$7.4\times 10^{4}$ and $2.9\times 10^{6}$ against standard FedNPG, and it
+brings FedNPG-ADMM's uplink to a quarter of unquantized FedPPO's. At 6 bits
+($10.7\times$) Swimmer and Hopper are still unaffected while Humanoid
+collapses at every agent count, so the safe bit width shrinks as the policy
+grows.
+
+\paragraph{Limitations and future work.} The missing axis is communication
+\emph{frequency}. FedNPG-ADMM optimizes what is transmitted per round, while
+FedAvg-style schemes with $E$ local steps optimize how often rounds occur
+\citep{jin2022fedrlheterogeneity, khodadadian2022linearspeedup}. The two are
+orthogonal and could be combined. Our Hopper diagnosis raises a second
+question we did not pursue: whether the exploration lost to variance reduction
+can be restored through an entropy term, which Algorithm~\ref{alg:fednpgadmm}
+lacks, without giving up the convergence benefit that more agents provide.

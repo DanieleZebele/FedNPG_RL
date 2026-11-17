@@ -1,0 +1,58 @@
+%% Return against cumulative uplink traffic, Humanoid-v4.
+%% x is the federation total: the per-agent cost is 2d*8 bytes per iteration
+%% for every N, and that invariance is the O(d) claim itself.
+%% Data: figures/communication_humanoid.dat (scripts/export_figures.py).
+\begin{tikzpicture}
+\begin{axis}[
+    width=\linewidth,
+    height=0.78\linewidth,
+    xlabel={Cumulative uplink (bytes)},
+    ylabel={Average batch return},
+    xmode=log,
+    ymin=0, ymax=7000,
+    ytick distance=1750,
+    scaled y ticks=base 10:-3,
+    ymajorgrids=true, xmajorgrids=true, grid style=dashed,
+    tick label style={font=\footnotesize},
+    label style={font=\footnotesize},
+    legend style={legend columns=2, font=\footnotesize, cells={anchor=west},
+                  anchor=north west, at={(0.02,0.98)}},
+]
+
+\addplot[name path=N1clo, draw=none, forget plot]
+    table[x=N1_bytes, y=N1_lo] {figures/communication_humanoid.dat};
+\addplot[name path=N1chi, draw=none, forget plot]
+    table[x=N1_bytes, y=N1_hi] {figures/communication_humanoid.dat};
+\addplot[colorA, opacity=0.15, forget plot] fill between[of=N1clo and N1chi];
+\addplot[colorA, line width=0.9pt]
+    table[x=N1_bytes, y=N1_mean] {figures/communication_humanoid.dat};
+\addlegendentry{$N=1$};
+
+\addplot[name path=N2clo, draw=none, forget plot]
+    table[x=N2_bytes, y=N2_lo] {figures/communication_humanoid.dat};
+\addplot[name path=N2chi, draw=none, forget plot]
+    table[x=N2_bytes, y=N2_hi] {figures/communication_humanoid.dat};
+\addplot[colorB, opacity=0.15, forget plot] fill between[of=N2clo and N2chi];
+\addplot[colorB, line width=0.9pt]
+    table[x=N2_bytes, y=N2_mean] {figures/communication_humanoid.dat};
+\addlegendentry{$N=2$};
+
+\addplot[name path=N4clo, draw=none, forget plot]
+    table[x=N4_bytes, y=N4_lo] {figures/communication_humanoid.dat};
+\addplot[name path=N4chi, draw=none, forget plot]
+    table[x=N4_bytes, y=N4_hi] {figures/communication_humanoid.dat};
+\addplot[colorC, opacity=0.15, forget plot] fill between[of=N4clo and N4chi];
+\addplot[colorC, line width=0.9pt]
+    table[x=N4_bytes, y=N4_mean] {figures/communication_humanoid.dat};
+\addlegendentry{$N=4$};
+
+\addplot[name path=N8clo, draw=none, forget plot]
+    table[x=N8_bytes, y=N8_lo] {figures/communication_humanoid.dat};
+\addplot[name path=N8chi, draw=none, forget plot]
+    table[x=N8_bytes, y=N8_hi] {figures/communication_humanoid.dat};
+\addplot[colorD, opacity=0.15, forget plot] fill between[of=N8clo and N8chi];
+\addplot[colorD, line width=0.9pt]
+    table[x=N8_bytes, y=N8_mean] {figures/communication_humanoid.dat};
+\addlegendentry{$N=8$};
+\end{axis}
+\end{tikzpicture}

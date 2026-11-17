@@ -1,0 +1,50 @@
+%% Return against cumulative uplink traffic at N=8, Hopper-v4, per bit width.
+%% Mean over five seeds; band spans min to max. The 64-bit curve is the N=8
+%% series of Figure 2, so the horizontal gap between curves is the saving.
+%% Data: figures/quant_comm_hopper.dat and figures/communication_hopper.dat
+%% (scripts/export_figures.py).
+\begin{tikzpicture}
+\begin{axis}[
+    width=\linewidth,
+    height=0.78\linewidth,
+    xlabel={Cumulative uplink (bytes)},
+    ylabel={Average batch return},
+    xmode=log,
+    ymin=0, ymax=3600,
+    ytick distance=900,
+    scaled y ticks=base 10:-3,
+    ymajorgrids=true, xmajorgrids=true, grid style=dashed,
+    tick label style={font=\footnotesize},
+    label style={font=\footnotesize},
+    legend style={legend columns=1, font=\footnotesize, cells={anchor=west},
+                  anchor=north west, at={(0.02,0.98)}},
+]
+
+\addplot[name path=N8qlo, draw=none, forget plot]
+    table[x=N8_bytes, y=N8_lo] {figures/communication_hopper.dat};
+\addplot[name path=N8qhi, draw=none, forget plot]
+    table[x=N8_bytes, y=N8_hi] {figures/communication_hopper.dat};
+\addplot[colorD, opacity=0.15, forget plot] fill between[of=N8qlo and N8qhi];
+\addplot[colorD, line width=0.9pt, solid]
+    table[x=N8_bytes, y=N8_mean] {figures/communication_hopper.dat};
+\addlegendentry{64 bit};
+
+\addplot[name path=q8qlo, draw=none, forget plot]
+    table[x=q8_bytes, y=q8_lo] {figures/quant_comm_hopper.dat};
+\addplot[name path=q8qhi, draw=none, forget plot]
+    table[x=q8_bytes, y=q8_hi] {figures/quant_comm_hopper.dat};
+\addplot[colorA, opacity=0.15, forget plot] fill between[of=q8qlo and q8qhi];
+\addplot[colorA, line width=0.9pt, dashed]
+    table[x=q8_bytes, y=q8_mean] {figures/quant_comm_hopper.dat};
+\addlegendentry{8 bit};
+
+\addplot[name path=q6qlo, draw=none, forget plot]
+    table[x=q6_bytes, y=q6_lo] {figures/quant_comm_hopper.dat};
+\addplot[name path=q6qhi, draw=none, forget plot]
+    table[x=q6_bytes, y=q6_hi] {figures/quant_comm_hopper.dat};
+\addplot[colorB, opacity=0.15, forget plot] fill between[of=q6qlo and q6qhi];
+\addplot[colorB, line width=0.9pt, dash dot]
+    table[x=q6_bytes, y=q6_mean] {figures/quant_comm_hopper.dat};
+\addlegendentry{6 bit};
+\end{axis}
+\end{tikzpicture}

@@ -1,0 +1,122 @@
+% !TEX root = ../main.tex
+\section{Reproduction results}
+\label{sec:reproduction}
+
+We run $N \in \{1,2,4,8\}$ on Swimmer-v4, Hopper-v4 and Humanoid-v4 with five
+random seeds per configuration (60 runs). Swimmer and Humanoid use the
+configuration listed in Appendix~\ref{app:hyperparameters}; Hopper uses a
+reduced one (Section~\ref{sec:implementation}).
+Table~\ref{tab:reproduction} reports
+the mean of each seed's final 100 iterations, then the mean and standard
+deviation across seeds, the same quantity Table~2 of the original reports.
+
+\begin{table}[t]
+  \centering
+  \caption{Final rewards, mean $\pm$ standard deviation across five seeds.
+  Original values are from Table~2 of \citet{lan2023fednpgadmm}, computed over
+  ten seeds. Humanoid does not appear in their Table~2. The Hopper row uses the
+  configuration of Section~\ref{sec:implementation}.}
+  \label{tab:reproduction}
+  \begin{tabular}{llrrrr}
+    \toprule
+    Environment & Source & $N=1$ & $N=2$ & $N=4$ & $N=8$ \\
+    \midrule
+    \multirow{2}{*}{Swimmer-v4}
+      & Ours  & $\mathbf{123.9 \pm 2.3}$ & $126.0 \pm 1.3$ & $127.0 \pm 0.8$ & $\mathbf{128.4 \pm 0.8}$ \\
+      & Paper & $109.4 \pm 5.9$  & $123.6 \pm 10.3$ & $127.2 \pm 2.2$ & $128.5 \pm 1.9$ \\
+    \midrule
+    \multirow{2}{*}{Hopper-v4}
+      & Ours  & $1941 \pm 494$ & $1636 \pm 282$ & $2536 \pm 116$ & $\mathbf{2656 \pm 286}$ \\
+      & Paper & $1473 \pm 383$ & $2384 \pm 371$ & $2507 \pm 230$ & $2719 \pm 173$ \\
+    \midrule
+    Humanoid-v4
+      & Ours  & $993 \pm 187$ & $3391 \pm 796$ & $5343 \pm 121$ & $\mathbf{6329 \pm 334}$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{figure}[t]
+  \centering
+  \begin{subfigure}[b]{0.49\textwidth}
+    \input{figures/convergence_swimmer}
+    \caption{Swimmer-v4}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.49\textwidth}
+    \input{figures/convergence_hopper}
+    \caption{Hopper-v4}
+  \end{subfigure}
+
+  \vspace{0.6em}
+  \begin{subfigure}[b]{0.49\textwidth}
+    \input{figures/convergence_humanoid}
+    \caption{Humanoid-v4}
+  \end{subfigure}
+  \caption{Convergence for each agent count. The solid line is the mean over five
+  seeds and the shaded band spans the minimum and maximum seed, so the band
+  shows the full observed range and not a modelled interval. Curves are
+  smoothed with a centred 21-iteration rolling mean before aggregation,
+  following \citet{spinningup}, who smooth the same quantity over eleven
+  epochs. Swimmer and Humanoid separate cleanly by agent count. On Hopper, four
+  and eight agents rise faster and finish higher than one and two, while within
+  each pair the bands overlap (Section~\ref{sec:hopper}).}
+  \label{fig:convergence}
+\end{figure}
+
+\begin{figure}[t]
+  \centering
+  \begin{subfigure}[b]{0.49\textwidth}
+    \input{figures/communication_swimmer}
+    \caption{Swimmer-v4}
+  \end{subfigure}
+  \hfill
+  \begin{subfigure}[b]{0.49\textwidth}
+    \input{figures/communication_hopper}
+    \caption{Hopper-v4}
+  \end{subfigure}
+
+  \vspace{0.6em}
+  \begin{subfigure}[b]{0.49\textwidth}
+    \input{figures/communication_humanoid}
+    \caption{Humanoid-v4}
+  \end{subfigure}
+  \caption{The same runs plotted against cumulative uplink traffic instead of
+  iteration count, on a logarithmic axis. The horizontal axis is the total
+  across the federation: each agent transmits $2d$ values per iteration
+  whatever $N$ is, so a per-agent axis would place all four series on top of
+  one another; that per-agent invariance is the $\Oh(d)$ property. On the
+  federation-wide axis the curves shift right as $N$ grows, by the traffic the
+  extra agents add.}
+  \label{fig:communication}
+\end{figure}
+
+\subsection{Swimmer: reproduced}
+
+Figure~\ref{fig:convergence}(a) shows the curves behind the Swimmer column, and
+Figure~\ref{fig:communication}(a) the same runs against uplink traffic. Final
+rewards fall within the reported spread at $N = 2, 4, 8$ and above it at
+$N=1$ ($123.9$ against $109.4 \pm 5.9$), and they increase monotonically with
+$N$, as the paper describes. More agents also learn faster: at iteration 50
+the smoothed return is $44$, $62$, $75$ and $105$ for $N = 1, 2, 4, 8$.
+
+\subsection{Humanoid: strong scaling}
+\label{sec:humanoid}
+
+Humanoid is absent from the original Table~2, so we have no direct comparison.
+The qualitative claim nevertheless holds, since return grows $6.4\times$ from $N=1$ to $N=8$,
+monotonically, with the $N=4$ and $N=8$ variance small relative to the mean.
+
+\subsection{Hopper}
+\label{sec:hopper}
+
+Four and eight agents reach $2536 \pm 116$ and $2656 \pm 286$
+(Table~\ref{tab:reproduction}), within one standard deviation of the reported
+$2507$ and $2719$, and learning speed increases with $N$ as the paper
+describes. At iteration 100 the smoothed training return in
+Figure~\ref{fig:convergence}(b) is $598$, $638$, $986$ and $1092$ for
+$N = 1, 2, 4, 8$. The ordering is not strictly monotone throughout: two agents
+finish below one ($1636 \pm 282$ against $1941 \pm 494$), and four agents
+briefly lead eight around iteration 200. Both gaps are smaller than the seed
+spread. What the five seeds resolve is two groups, one and two agents against
+four and eight, separated by roughly $700$ at the end of training. Our
+single-agent value is above the reported $1473$.

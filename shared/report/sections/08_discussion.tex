@@ -1,0 +1,17 @@
+% !TEX root = ../main.tex
+\section{Threats to validity}
+\label{sec:discussion}
+
+Our study uses five seeds against the original's ten, so our error bars are
+wider than they appear relative to a ten-seed estimate. Hopper is reported
+under a different configuration from Swimmer and Humanoid
+(Table~\ref{tab:ours}), so comparisons across environments mix the algorithm
+with its practical settings. All runs use a single machine and a single
+software stack, so implementation-level differences from the authors' setup
+cannot be separated from algorithmic ones. That concern has precedent here:
+the same algorithm under identical hyperparameters has been shown to differ by
+more than a factor of two on Hopper across implementations
+\citep{henderson2018matters}. Finally, two hyperparameters ($\eta$ and the
+interpretation of Table~4's learning-rate column,
+Section~\ref{sec:implementation}) are our reading of an ambiguous source, and
+a different reading could change the results, on Hopper in particular.

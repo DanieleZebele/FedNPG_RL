@@ -1,0 +1,30 @@
+% !TEX root = ../main.tex
+Federated Natural Policy Gradient (FedNPG) inherits the fast convergence of
+Natural Policy Gradient (NPG) but
+requires every agent to uplink its local Fisher information matrix $\bH_i \in
+\Rb^{d\times d}$ each round. The resulting $\Oh(d^2)$ communication cost
+becomes prohibitive for deep policies. \citet{lan2023fednpgadmm} reformulate
+the global natural-gradient direction as a distributed quadratic program
+solved by the Alternating Direction Method of Multipliers (ADMM), so that
+each agent transmits only two $d$-dimensional vectors,
+an $\Oh(d)$ cost, at the same convergence rate. We reproduce that method from
+scratch in PyTorch and evaluate it on Swimmer-v4, Hopper-v4 and Humanoid-v4
+with $N \in \{1,2,4,8\}$ agents over five random seeds. On Swimmer we match
+the reported final rewards at every agent count, with tighter seed variance
+than the original at each of them; on Humanoid the method scales from
+$993$ to $6329$ average return as agents increase from one to eight. Hopper is
+the one environment where we fail to reproduce the reported trend: performance
+\emph{decreases} monotonically with the number of agents. We trace this to the
+interaction between Hopper's small per-step survival bonus and the variance
+reduction that additional agents provide, and support the explanation with
+per-seed and per-step measurements. We further quantify the communication
+saving directly, measuring reductions of $2.4\times 10^{3}$, $9.2\times
+10^{3}$ and $3.6\times 10^{5}$ transmitted parameters per agent per round on
+the three environments.
+Finally, we quantize the agent-to-server transmissions, which the original
+work does not attempt. With an unbiased stochastic quantizer at 8 bits the
+uplink falls by a further $8\times$, compounding to $2.9\times 10^{6}$ fewer
+transmitted bits per agent per round than standard FedNPG on Humanoid, while
+final rewards stay within one standard deviation of the unquantized runs on all
+three environments and agent counts. At 6 bits Swimmer and Hopper are still
+unaffected, whereas Humanoid collapses.

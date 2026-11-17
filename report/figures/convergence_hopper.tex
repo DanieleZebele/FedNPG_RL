@@ -1,0 +1,57 @@
+%% Convergence, Hopper-v4. Mean over five seeds; band spans min to max.
+%% Data: figures/convergence_hopper.dat (scripts/export_figures.py).
+\begin{tikzpicture}
+\begin{axis}[
+    width=\linewidth,
+    height=0.78\linewidth,
+    xlabel={Iteration},
+    ylabel={Average batch return},
+    xmin=1, xmax=2000,
+    ymin=0, ymax=3600,
+    xtick distance=500,
+    ytick distance=900,
+    scaled y ticks=base 10:-3,
+    ymajorgrids=true, xmajorgrids=true, grid style=dashed,
+    tick label style={font=\footnotesize},
+    label style={font=\footnotesize},
+    legend style={legend columns=2, font=\footnotesize, cells={anchor=west},
+                  anchor=south east, at={(0.99,0.02)}},
+]
+
+\addplot[name path=N1lo, draw=none, forget plot]
+    table[x=iteration, y=N1_lo] {figures/convergence_hopper.dat};
+\addplot[name path=N1hi, draw=none, forget plot]
+    table[x=iteration, y=N1_hi] {figures/convergence_hopper.dat};
+\addplot[colorA, opacity=0.15, forget plot] fill between[of=N1lo and N1hi];
+\addplot[colorA, line width=0.9pt]
+    table[x=iteration, y=N1_mean] {figures/convergence_hopper.dat};
+\addlegendentry{$N=1$};
+
+\addplot[name path=N2lo, draw=none, forget plot]
+    table[x=iteration, y=N2_lo] {figures/convergence_hopper.dat};
+\addplot[name path=N2hi, draw=none, forget plot]
+    table[x=iteration, y=N2_hi] {figures/convergence_hopper.dat};
+\addplot[colorB, opacity=0.15, forget plot] fill between[of=N2lo and N2hi];
+\addplot[colorB, line width=0.9pt]
+    table[x=iteration, y=N2_mean] {figures/convergence_hopper.dat};
+\addlegendentry{$N=2$};
+
+\addplot[name path=N4lo, draw=none, forget plot]
+    table[x=iteration, y=N4_lo] {figures/convergence_hopper.dat};
+\addplot[name path=N4hi, draw=none, forget plot]
+    table[x=iteration, y=N4_hi] {figures/convergence_hopper.dat};
+\addplot[colorC, opacity=0.15, forget plot] fill between[of=N4lo and N4hi];
+\addplot[colorC, line width=0.9pt]
+    table[x=iteration, y=N4_mean] {figures/convergence_hopper.dat};
+\addlegendentry{$N=4$};
+
+\addplot[name path=N8lo, draw=none, forget plot]
+    table[x=iteration, y=N8_lo] {figures/convergence_hopper.dat};
+\addplot[name path=N8hi, draw=none, forget plot]
+    table[x=iteration, y=N8_hi] {figures/convergence_hopper.dat};
+\addplot[colorD, opacity=0.15, forget plot] fill between[of=N8lo and N8hi];
+\addplot[colorD, line width=0.9pt]
+    table[x=iteration, y=N8_mean] {figures/convergence_hopper.dat};
+\addlegendentry{$N=8$};
+\end{axis}
+\end{tikzpicture}

@@ -1,0 +1,67 @@
+% !TEX root = ../main.tex
+\section{Implementation}
+\label{sec:implementation}
+
+The implementation is written from scratch in PyTorch; no reference code for
+FedNPG-ADMM is publicly available. The algorithm proper (\texttt{agent.py},
+\texttt{server.py}) stays free of orchestration concerns, and every
+agent-to-server transmission is routed through a single \texttt{Channel}
+abstraction that meters bytes. That chokepoint is what makes the communication
+comparison in Section~\ref{sec:baselines} meaningful: all three algorithms
+count bytes through the same code, and the quantization study of
+Section~\ref{sec:quantization} attaches there without any algorithm importing
+it.
+
+\subsection{What comes from the paper and what does not}
+
+Table~\ref{tab:table4} reproduces the paper's hyperparameters. Two values in
+our pipeline are \emph{not} transcriptions. First, $\eta$ in line~12 of
+Algorithm~\ref{alg:fednpgadmm} appears nowhere in Table~4 of the original. The
+paper derives it analytically from smoothness constants it never reports
+numerically, so we set $\eta = 1$, taking the ADMM step unscaled. Second,
+Table~4's ``Learning rate'' column ($3\times10^{-4}$, $3\times10^{-4}$,
+$10^{-5}$) is used here as the \emph{critic's} Adam learning rate, not an
+actor step size. Those are characteristic Adam values, and the paper defines
+the actor's step analytically, which we read as evidence that the column
+refers to the critic. This is an interpretation of an ambiguous table.
+
+\subsection{Practical settings}
+
+The paper's own setup section states that it follows ``the practical settings
+in TRPO with line search and in stable-baselines3 with generalized advantage
+estimation (0.95) and the Adam optimizer''. Algorithm~\ref{alg:fednpgadmm}'s
+pseudocode contains none of these, so we adopt the standard versions and list
+them in Appendix~\ref{app:hyperparameters}: running observation and reward
+normalization, advantage normalization, orthogonal initialization, Generalized Advantage
+Estimation (GAE) with $\lambda = 0.95$, minibatch critic fitting, and a backtracking line search on
+the true KL and the importance-sampled surrogate. The line search matters. The
+closed-form step of line~12 controls only the second-order approximation of
+the KL, so without a safeguard it can overshoot the intended trust region.
+
+Two further design choices are ours because the paper is silent. The critic is
+fit on data \emph{pooled} across agents; the paper describes only the actor's
+update and never says how a federated critic is trained. And when $(\sum_i
+\bg_i)^{\top}\by \le 0$ the step size in line~12 is undefined, in which case
+we skip the update for that iteration and log how often it happens.
+
+\subsection{Reporting conventions}
+
+We report the paper's own metric: the average trajectory return across the
+batch collected at each iteration, plotted against iterations. Two measurement
+issues are worth stating because they materially changed our numbers.
+
+First, this metric averages only the episodes that \emph{complete} within one
+iteration's timestep budget. On Hopper at $N=1$ that is roughly $1.2$ episodes
+per point, so each plotted value is close to a single episode, which makes the
+curve appear unstable even when the underlying policy is not. We therefore
+also record a trailing 100-episode mean and, separately, a deterministic
+evaluation (mean action, no exploration noise, on a held-out environment), the
+quantity published benchmarks such as \texttt{rl-baselines3-zoo} report. The
+deterministic number runs roughly $1.2\times$ higher than the stochastic one,
+so the two are not interchangeable.
+
+Second, no published MuJoCo learning curve plots this metric raw.
+\citet{spinningup} smooth the identical quantity over an 11-epoch window and
+average 10 seeds, and \texttt{rl-baselines3-zoo} uses a 100-episode rolling
+window. Where we show curves we state the smoothing in the caption, following
+the recommendation of \citet{huang2024openrlbenchmark}.

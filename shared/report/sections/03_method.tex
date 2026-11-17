@@ -1,0 +1,197 @@
+% !TEX root = ../main.tex
+\section{FedNPG-ADMM}
+\label{sec:method}
+
+\subsection{The global direction as a consensus problem}
+
+The direction in \eqref{eq:stdfednpg} is the solution of a quadratic problem
+whose objective is a sum over agents \citep{lan2023fednpgadmm}:
+\begin{equation}
+  \by^{\star}
+  \;=\;\Big(\sum_i \bH_i\Big)^{\!-1}\sum_i \bg_i
+  \;=\;\arg\min_{\by}\;
+  \sum_{i=1}^{N}\Big(\tfrac{1}{2}\by^{\top}\bH_i\by - \bg_i^{\top}\by\Big).
+  \label{eq:qp}
+\end{equation}
+Each summand depends only on agent $i$'s data, but all of them share the same
+$\by$. Giving every agent its own copy $\by_i$ and requiring the copies to
+agree turns \eqref{eq:qp} into the equivalent consensus problem
+\begin{equation}
+  \min_{\by,\{\by_i\}}\;
+  \sum_{i=1}^{N}\Big(\tfrac{1}{2}\by_i^{\top}\bH_i\by_i - \bg_i^{\top}\by_i
+  + \tfrac{\rho}{2}\|\by_i - \by\|^2\Big)
+  \quad \text{s.t.}\quad \by_i = \by,\; i = 1,\dots,N,
+  \label{eq:consensus}
+\end{equation}
+where the penalty $\tfrac{\rho}{2}\|\by_i - \by\|^2$, with $\rho > 0$, is
+zero on the feasible set and so leaves the solution unchanged. With dual
+variables $\blam_i \in \Rb^d$ for the constraints, the Lagrangian is
+\begin{equation}
+  \mathcal{L}\big(\by, \{\by_i\}, \{\blam_i\}\big) \;=\;
+  \sum_{i=1}^{N}\Big(\tfrac{1}{2}\by_i^{\top}\bH_i\by_i - \bg_i^{\top}\by_i
+  + \tfrac{\rho}{2}\|\by_i - \by\|^2 + \blam_i^{\top}(\by_i - \by)\Big).
+  \label{eq:lagrangian}
+\end{equation}
+
+\subsection{The ADMM updates}
+
+The Alternating Direction Method of Multipliers \citep{boyd2011admm}
+minimizes \eqref{eq:lagrangian} over the local copies, then over the
+consensus variable, then takes a gradient-ascent step on the duals. Each
+update has a closed form.
+
+\paragraph{Local step.} Setting
+$\partial\mathcal{L}/\partial\by_i = \bH_i\by_i - \bg_i +
+\rho(\by_i - \by) + \blam_i = 0$ gives
+\begin{equation}
+  \by_i \;=\; (\bH_i + \rho I)^{-1}\big(\bg_i - \blam_i + \rho\,\by\big),
+  \label{eq:localstep}
+\end{equation}
+which involves only agent $i$'s own $\bH_i$ and $\bg_i$.
+
+\paragraph{Consensus step.} Setting
+$\partial\mathcal{L}/\partial\by = -\sum_i\big(\rho(\by_i - \by) +
+\blam_i\big) = 0$ gives
+$\by = \frac1N\sum_i \by_i + \frac{1}{N\rho}\sum_i\blam_i$.
+
+\paragraph{Dual step.} $\blam_i \leftarrow \blam_i + \rho\,(\by_i - \by)$.
+
+\medskip
+The sum of the duals is conserved. Summing the dual step over agents adds
+$\rho\big(\sum_i\by_i - N\by\big)$, which is zero whenever $\by$ is the plain
+average of the $\by_i$. Starting from $\blam_i = \mathbf{0}$, the duals
+therefore always sum to zero, and the consensus step reduces to
+$\by = \frac1N\sum_i\by_i$: the server only ever averages. At a fixed point,
+where every $\by_i = \by$, the local step reads $\bH_i\by = \bg_i - \blam_i$,
+and summing over agents gives $\big(\sum_i\bH_i\big)\by = \sum_i\bg_i$, which
+is exactly the direction \eqref{eq:qp}. The only quantities that cross the
+network are $\by_i$ and $\bg_i$, two $d$-dimensional vectors per agent.
+
+FedNPG-ADMM does not run ADMM to convergence within an iteration. It performs
+a single round per policy iteration and carries $\by$ and $\blam_i$ over to the
+next one, so the ADMM iterates track a target that moves slowly as $\bthe$
+changes. Algorithm~\ref{alg:fednpgadmm} lists the result; Theorem~\ref{thm:conv}
+below shows that one round per iteration is enough.
+
+\subsection{Algorithm}
+
+\begin{algorithm}[t]
+\caption{FedNPG-ADMM (Algorithm 1 of \citealp{lan2023fednpgadmm})}
+\label{alg:fednpgadmm}
+\begin{algorithmic}[1]
+  \State \textbf{Initialize} $\bthe^0$, $\by^0 = \mathbf{0}$,
+         $\by_i^0 = \by^0$, $\blam_i = \mathbf{0}$ for all $i$
+  \For{$k = 0, 1, \dots, K-1$}
+    \State Server broadcasts $\bthe^k$ and $\by^{k-1}$ to all agents
+    \For{each agent $i$ \textbf{in parallel}}
+      \State Collect a rollout of $T$ timesteps under $\pi_{\bthe^k}$
+      \State $\blam_i \leftarrow \blam_i + \rho\,(\by_i - \by^{k-1})$
+             \Comment{dual update}
+      \State $\bg_i \leftarrow \frac{1}{|\mathcal{D}_i|}\sum_{t}
+             \nabla_{\bthe}\log\pi_{\bthe}(a_t \mid s_t)\,\hat{A}_t$
+             \Comment{score-function gradient}
+      \State $\by_i \leftarrow (\bH_i + \rho I)^{-1}
+             (\bg_i - \blam_i + \rho\,\by^{k-1})$
+             \Comment{local solve, by conjugate gradient}
+      \State Send $\by_i, \bg_i$ to the server
+             \Comment{$\Oh(d)$}
+    \EndFor
+    \State $\by^{k} \leftarrow \frac{1}{N}\sum_{i} \by_i$
+    \State $\bthe^{k+1} \leftarrow \bthe^{k} +
+           \eta\sqrt{\dfrac{2N\delta}{(\sum_i \bg_i)^{\top}\by^{k}}}\;\by^{k}$
+  \EndFor
+\end{algorithmic}
+\end{algorithm}
+
+Line~8 is the local step \eqref{eq:localstep}, and it is where the $\Oh(d)$
+claim is earned. The system $(\bH_i + \rho I)\by_i = \bg_i - \blam_i +
+\rho\by^{k-1}$ is solved by Conjugate Gradient (CG), which needs only
+Fisher-vector products on agent $i$'s own data, so $\bH_i$ is never formed.
+The $\rho I$ term is simultaneously the ADMM penalty and a
+Levenberg--Marquardt damping that keeps the system well-conditioned.
+
+Line~12's step size carries a factor $N$ that the single-agent step
+\eqref{eq:npgstep} lacks, and the factor is what makes the trust region refer
+to the average agent. At exact consensus, $\by^k$ solves \eqref{eq:qp}, hence
+$(\sum_i \bg_i)^{\top}\by = \by^{\top}(\sum_i \bH_i)\by$. Constraining the
+\emph{average} per-agent KL to $\delta$ means
+$\tfrac12 \alpha^2 \by^{\top}\big(\tfrac{1}{N}\sum_i\bH_i\big)\by \le \delta$,
+which rearranges exactly to the $\sqrt{2N\delta/(\sum_i\bg_i)^\top\by}$ of
+line~12. The denominator $(\sum_i\bg_i)^{\top}\by$ grows linearly with the
+number of agents, and the $N$ in the numerator cancels that growth, so every
+iteration moves the policy by the same KL divergence $\delta$ whatever $N$
+is. More agents
+therefore give a better-estimated direction, not a larger step.
+
+\subsection{Convergence guarantee}
+
+\citet{lan2023fednpgadmm} show that the single ADMM round loses nothing in
+convergence rate. They assume a bounded score function,
+$\|\nabla_{\bthe}\log\pi_{\bthe}(a\mid s)\| \le G$, that is $M$-Lipschitz in
+$\bthe$, bounded rewards $r(s,a) \in [0, R]$, and a Fisher matrix bounded
+away from singularity, $\bF(\bthe) \succeq \mu_F I$ for some $\mu_F > 0$.
+Writing $L_J$ for the smoothness constant of $J$, their result is the
+following.
+
+\begin{theorem}[Theorem~4.3 of \citealp{lan2023fednpgadmm}]
+\label{thm:conv}
+For a target error $\epsilon$, let each agent sample
+$\Oh\big(1/((1-\gamma)^4 N\epsilon)\big)$ trajectories per iteration, and set
+$\eta = \mu_F^2 / \big(4G^2(56G^2 + L_J)\big)$. After
+$K = \Oh\big(1/((1-\gamma)^2\epsilon)\big)$ iterations,
+\begin{equation}
+  \frac{1}{K}\sum_{k=1}^{K} \Exp\big\|\nabla J(\bthe^k)\big\|^2 \;\le\; \epsilon .
+\end{equation}
+\end{theorem}
+
+The proof shows that the gap between the ADMM direction $\by^k$ and the exact
+natural-gradient direction shrinks geometrically from one iteration to the
+next, down to a floor set by the statistical error of the sampled gradients,
+which decays with the batch size. One ADMM round per iteration therefore
+inherits the iteration complexity of exact NPG. Table~\ref{tab:complexity}
+puts this together per agent. The factor $N$ in the per-agent sample
+complexity is the benefit of federation: each agent collects $1/N$ of the
+data a single learner would need. The communication complexity is $K$ rounds
+of $2d$ values, against $K$ rounds of $d^2$ for standard-average FedNPG.
+
+\begin{table}[t]
+  \centering
+  \caption{Per-agent complexity to reach an $\epsilon$-stationary point, from
+  Table~1 of \citet{lan2023fednpgadmm}.}
+  \label{tab:complexity}
+  \begin{tabular}{lccc}
+    \toprule
+     & NPG & Standard-average FedNPG & FedNPG-ADMM \\
+    \midrule
+    Samples
+      & $\Oh\!\left(\frac{1}{(1-\gamma)^6\epsilon^2}\right)$
+      & $\Oh\!\left(\frac{1}{(1-\gamma)^6 N\epsilon^2}\right)$
+      & $\Oh\!\left(\frac{1}{(1-\gamma)^6 N\epsilon^2}\right)$ \\[6pt]
+    Communication
+      & ---
+      & $\Oh\!\left(\frac{d^2}{(1-\gamma)^2\epsilon}\right)$
+      & $\Oh\!\left(\frac{d}{(1-\gamma)^2\epsilon}\right)$ \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+The theorem's $\eta$ depends on constants ($G$, $L_J$, $\mu_F$) that are not
+known for a neural policy, so in practice $\eta$ is a hyperparameter
+(Section~\ref{sec:implementation}).
+
+\subsection{A property of the single-agent case}
+
+One consequence of Algorithm~\ref{alg:fednpgadmm} matters for interpreting
+$N=1$ results and is not remarked on in the original. With one agent, the
+broadcast consensus variable is that agent's own previous solve, $\by^{k-1} =
+\by_1^{k-1}$, so line~6 reads $\blam_1 \leftarrow \blam_1 + \rho(\by_1 -
+\by_1) = \blam_1$ and the dual variable never leaves its zero initialization.
+Algorithm~\ref{alg:fednpgadmm} at $N = 1$ therefore reduces exactly to
+\begin{equation}
+  \by \;=\; (\bH + \rho I)^{-1}\big(\bg + \rho\,\by^{k-1}\big),
+\end{equation}
+damped NPG with a momentum term, exercising none of the consensus machinery.
+We verified this numerically: $\|\blam_1\| = 0$ to machine precision at every
+iteration for $N=1$, and non-zero from the second iteration onwards for $N >
+1$. Any $N = 1$ number in this report, and in the original, should be read
+with that in mind.

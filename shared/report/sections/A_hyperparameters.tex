@@ -1,0 +1,55 @@
+% !TEX root = ../main.tex
+\section{Hyperparameters}
+\label{app:hyperparameters}
+
+\begin{table}[H]
+  \centering
+  \caption{Values transcribed from Table~4 of \citet{lan2023fednpgadmm}.
+  $\lambda_{\text{GAE}} = 0.95$ comes from the paper's setup text rather than
+  the table.}
+  \label{tab:table4}
+  \begin{tabular}{lrrr}
+    \toprule
+     & Swimmer-v4 & Hopper-v4 & Humanoid-v4 \\
+    \midrule
+    ADMM penalty $\rho$        & $0.1$   & $0.1$   & $0.01$ \\
+    Trust region $\delta$      & $0.01$  & $0.01$  & $0.01$ \\
+    Discount $\gamma$          & $0.99$  & $0.99$  & $0.99$ \\
+    Timesteps per iteration $T$& $2048$  & $1024$  & $512$ \\
+    Iterations $K$             & $1000$  & $2000$  & $3000$ \\
+    Learning rate (critic)     & $3\times10^{-4}$ & $3\times10^{-4}$ & $10^{-5}$ \\
+    Hidden layers              & $64\times64$ & $128\times128$ & $512^{3}$ \\
+    Hidden activation          & ReLU & ReLU & ReLU \\
+    Policy mean output         & Tanh & Tanh & Tanh \\
+    \bottomrule
+  \end{tabular}
+\end{table}
+
+\begin{table}[H]
+  \centering
+  \caption{Settings not specified by the paper, per environment. Swimmer and
+  Humanoid follow the practical basis the paper's setup section cites (TRPO
+  with line search, and stable-baselines3). Hopper uses a reduced set,
+  closer to Algorithm~\ref{alg:fednpgadmm} as written
+  (Section~\ref{sec:implementation}).}
+  \label{tab:ours}
+  \footnotesize
+  \setlength{\tabcolsep}{4pt}
+  \begin{tabular}{@{}llll@{}}
+    \toprule
+    Setting & Swimmer, Humanoid & Hopper & Basis \\
+    \midrule
+    Obs.\ normalization & running mean/std, clip $10$ & off & SB3 \texttt{VecNormalize} \\
+    Reward normalization      & scale by return std, clip $10$ & off & SB3 \texttt{VecNormalize} \\
+    Adv.\ normalization       & per agent, $(a-\mu)/(\sigma+10^{-8})$ & off & SB3 \\
+    Line search               & 10 backtracks, shrink $0.8$ & off & TRPO \\
+    $\log\sigma$ clamp        & $[-2.0,\, 0.5]$ & off & ours \\
+    Orthogonal init.          & \multicolumn{2}{l}{gain $\sqrt{2}$ hidden, $0.01$ policy, $1.0$ value} & SB3 \\
+    $\log\sigma$ initial      & \multicolumn{2}{l}{$-0.5$} & tianshou, Spinning Up \\
+    Critic fitting            & \multicolumn{2}{l}{10 epochs, minibatch 64, Adam} & SB3 PPO defaults \\
+    CG iters / damping        & \multicolumn{2}{l}{$10$ / $\rho$} & TRPO, line~8 \\
+    $\eta$                    & \multicolumn{2}{l}{$1.0$} & not specified \\
+    Seeds                     & \multicolumn{2}{l}{$0$--$4$} & --- \\
+    \bottomrule
+  \end{tabular}
+\end{table}
